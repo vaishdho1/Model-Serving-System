@@ -1,0 +1,8 @@
+1. Tested the health checks between a single node and  server
+2. Tested node registration between to the server
+3. Tested crete replica requests (upto 4) to a single node
+4. Tested send requests to the node
+5. Tested health updates between replicas and worker node
+6. Checked queue population for a single replica and whether the status is reaching the main server.
+7. Tested killing replicas and propogation of information to the main server
+8. Tested sending nack to the node to kill it and see if the replicas are killed

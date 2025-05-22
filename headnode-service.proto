@@ -1,0 +1,77 @@
+syntax = "proto3";
+
+package raylet;
+
+service HeadNodeService {
+ 
+  rpc CreateReplica(ReplicaCreationRequest) returns (ReplicaCreationReply); //request from headNode
+  rpc SendRequest(ReplicaRequest) returns(ReplicaReply); //request from headNode
+  rpc SendHealthStatus(HealthStatusUpdate) returns(HealthStatusReply); // request from curNode
+  rpc RegisterNode(RegisterRequest) returns(RegisterReply);
+}
+
+message ReplicaCreationRequest {
+  string base_node_address = 1; // The node which sends request: Currently only headNode is sending
+  uint32 num_resources = 2; //How many resources are used by the ReplicaCreationReply
+  string resource_name = 3; //What is the type of resources(GPU or CPU)
+}
+message ReplicaCreationReply{
+  uint32 worker_id = 1; //The worker id
+  uint32 replica_id = 2;//The id of the new generated replica
+  bool created = 3;//The status of the replica
+}
+message Message{
+  string model = 1; //Name of the model to load.If the model already exists this will ignore
+  string input = 2;//This is the input going into the model
+}
+message ReplicaRequest{
+  uint32 worker_id = 1; //The worker id
+  uint32 replica_id = 2;//The id of the new generated replica
+  Message message = 3;
+}
+message ReplicaReply{
+  uint32 worker_id = 1;
+  uint32 replica_id = 2;
+  string output = 3;
+}
+message Resource {
+  uint32 used_resources = 1; // Number of resources used
+  string name = 2;           // The name of the resource
+  string state = 3;          // One of running, idle, killed
+  uint32 queue_length = 4;     // Number of active requests in queue
+}
+
+message ReplicaState
+{
+  uint32 replica_id = 1;
+  uint32 queue_size = 2;
+  string status = 3; //Whether the actor is dead or alive
+}
+/*
+message HealthStatusUpdate {
+  uint32 worker_id = 1;    // The worker ID
+  uint32 replica_id = 2;   // The ID of the new generated replica
+  Resource resource = 3;   // A single resource object
+}
+*/
+message HealthStatusUpdate {
+  uint32 worker_id = 1; // The worker ID
+  string state = 2; // Worker state
+  repeated ReplicaState replica_states = 3;
+}
+
+message HealthStatusReply {
+  // E.g., an acknowledgment
+  bool ack = 1;
+  string isAlive = 2; // This is a message from headNode which says whether the worker node is stillAlive
+                      //if not the worker node needs to be killed by the worker node
+}
+message RegisterRequest{
+  uint32 node_id = 1; //ID of the current node, this is handled in the beginning
+  string node_address = 2;//Address of the node
+  string port = 3;//Port where the worker starts
+  string state = 4;//Status of the Node at start up
+}
+message RegisterReply{
+  bool ack = 1;//Head Node acknowledges the system
+}

@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package worker;
+
+import "google/protobuf/empty.proto";
+
+service WorkerService {
+  rpc PushTask(TaskRequest) returns (TaskReply);
+  rpc sendHealthupdate(HealthStatus) returns (HealthReply);
+  rpc RegisterReplica(replicaStatus) returns (Reply);
+  rpc Ping(google.protobuf.Empty) returns (Ack);
+}
+
+message TaskRequest {
+  string model = 1; //Name of the model to load.If the model already exists this will ignore
+  string input = 2;//This is the input going into the model
+}
+
+message TaskReply {
+  // Fields returned by the worker
+  string result = 1; //Result of the prompt/input
+}
+
+message HealthStatus{
+  string status = 1;//Whether busy or Idle.This is used for adding more tasks
+  uint32 replica_id = 2;//
+}
+
+message HealthReply
+{
+  bool ack = 1; //Just normal replying
+}
+
+message Ack {
+  bool acknowledged = 1;
+}
+
+message replicaStatus
+{
+  string state = 1;// Whether Alive or Dead
+  uint32 replica_id = 2;//The id of the replica
+  uint32 pid = 3;
+  string port = 4;//The port where this server starts
+}
+
+message Reply
+{
+  bool ack = 1; // Just normmal replying
+}

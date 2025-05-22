@@ -1,0 +1,7 @@
+{
+    "makefile.configureOnOpen": true,
+    "files.associations": {
+        "functional": "cpp"
+    },
+    "python.analysis.autoImportCompletions": true
+}

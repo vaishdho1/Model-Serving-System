@@ -3,6 +3,7 @@ import grpc
 import asyncio
 from src.lib import HeadStoreClient
 from src.lib import HeadStoreClient
+
 class HeadNodeManager(headnode_service_pb2_grpc.HeadNodeServiceServicer):
     def __init__(self, node_id, node_address, node_port, head_address, head_port):
         self.worker_id = node_id

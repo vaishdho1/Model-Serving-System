@@ -1,8 +1,8 @@
 import asyncio
 import grpc
 import argparse
-import headnode_service_pb2
-import headnode_service_pb2_grpc
+from src.generated import headnode_service_pb2
+from src.generated import headnode_service_pb2_grpc
 import sys # For sys.exit in case of fatal client errors
 
 # Configuration

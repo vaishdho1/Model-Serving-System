@@ -1,9 +1,7 @@
 from concurrent import futures
 import grpc
-import worker_service_pb2
-import worker_service_pb2_grpc
-import headnode_service_pb2
-import headnode_service_pb2_grpc
+from src.generated import headnode_service_pb2, worker_service_pb2, worker_service_pb2_grpc, headnode_service_pb2_grpc
+
 import multiprocessing
 import grpc
 from dataclasses import dataclass
@@ -11,19 +9,12 @@ from concurrent import futures
 import subprocess
 import time
 import os
-import worker_service_pb2
-import worker_service_pb2_grpc
-import threading
-import queue
+
 import argparse
-import configurations
+from src.lib import configurations, FutureManager, HeadStoreClient, Replica
 import signal
 import asyncio
-from future_manager import FutureManager
-from headstore_client import HeadStoreClient
-from replica import Replica
 from google.protobuf import empty_pb2
-import random # Ensure random is imported
 replica_lock = asyncio.Lock()
 '''
 This is the code of a general worker node scheduler.
@@ -264,16 +255,12 @@ class HeadNodeManager(headnode_service_pb2_grpc.HeadNodeServiceServicer):
                 subprocess.Popen(cmd, stdout=log_file, stderr=log_file)
         except Exception as e:
             print(f"[Scheduler-{self.worker_id}] Failed to start replica process for ID {replica_id}: {e}")
-            # If Popen fails, we should set the future with an error if the FutureManager supports it,
-            # or the client waiting on the future will eventually time out.
-            # For now, let's assume FutureManager can handle an error or a specific failure state.
-            # If ReplicaCreationReply has an error field, use it.
-            # Assuming set_result can take a reply object directly:
+            
             error_reply = headnode_service_pb2.ReplicaCreationReply(
                 worker_id=self.worker_id, 
                 replica_id=replica_id, 
                 created=False 
-                # error_message=str(e) # If your .proto has an error_message field
+                
             )
             replica_futures.set_result(replica_id, error_reply)
             return error_reply # Return the error reply directly to the gRPC client

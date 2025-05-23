@@ -1,8 +1,7 @@
 import asyncio
 import grpc
 from typing import Dict, Any
-import headnode_service_pb2
-import headnode_service_pb2_grpc
+from src.generated import headnode_service_pb2, headnode_service_pb2_grpc
 import configurations
 import time
 import os

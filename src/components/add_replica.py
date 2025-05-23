@@ -1,28 +1,19 @@
 # Start a replica server given the port and send ready reques
 from concurrent import futures
 import grpc
-import worker_service_pb2
-import worker_service_pb2_grpc
-import headnode_service_pb2
-import headnode_service_pb2_grpc
-import multiprocessing
+from src.generated import headnode_service_pb2, worker_service_pb2, worker_service_pb2_grpc, headnode_service_pb2_grpc
 import grpc
 from dataclasses import dataclass
 from concurrent import futures
 import subprocess
 import time
 import os
-import worker_service_pb2
-import worker_service_pb2_grpc
 import threading
 import queue
 import argparse
-import configurations
+from src.lib import configurations, HeadStoreClient, FutureManager, Replica
 import signal
 import asyncio
-from future_manager import FutureManager
-from headstore_client import HeadStoreClient
-from replica import Replica
 
 
 '''

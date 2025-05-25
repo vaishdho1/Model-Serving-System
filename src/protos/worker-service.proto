@@ -3,23 +3,50 @@ syntax = "proto3";
 package worker;
 
 import "google/protobuf/empty.proto";
+import "common.proto";
 
-service WorkerService {
-  rpc PushTask(TaskRequest) returns (TaskReply);
+service ReplicaService {
+  
   rpc sendHealthupdate(HealthStatus) returns (HealthReply);
   rpc RegisterReplica(replicaStatus) returns (Reply);
-  rpc Ping(google.protobuf.Empty) returns (Ack);
 }
 
-message TaskRequest {
+service HeadNodeService{
+  // serve-controller
+   rpc CreateReplica(ReplicaCreationRequest) returns (ReplicaCreationReply); 
+   //Headnode calls
+  rpc SendRequest(ReplicaRequest) returns(ReplicaReply);
+
+}
+message ReplicaCreationRequest {
+ 
+  string base_node_address = 1; // The node which sends request: Currently only headNode is sending
+  uint32 num_resources = 2; //How many resources are used by the ReplicaCreationReply
+  string resource_name = 3; //What is the type of resources(GPU or CPU)
+  uint32 deployment_id = 4; //This is the deployment_id associated with the replica
+}
+message ReplicaCreationReply{
+  uint32 worker_id = 1; //The worker id
+  uint32 replica_id = 2;//The id of the new generated replica
+  bool created = 3;//The status of the replica
+  uint32 deployment_id = 4; // The deployment this belongs to : It loads the model as soon as the request comes
+}
+
+message Message{
   string model = 1; //Name of the model to load.If the model already exists this will ignore
   string input = 2;//This is the input going into the model
 }
-
-message TaskReply {
-  // Fields returned by the worker
-  string result = 1; //Result of the prompt/input
+message ReplicaRequest{
+  uint32 worker_id = 1; //The worker id
+  uint32 replica_id = 2;//The id of the new generated replica
+  Message message = 3;
 }
+message ReplicaReply{
+  uint32 worker_id = 1;
+  uint32 replica_id = 2;
+  string output = 3;
+}
+
 
 message HealthStatus{
   string status = 1;//Whether busy or Idle.This is used for adding more tasks
@@ -31,9 +58,7 @@ message HealthReply
   bool ack = 1; //Just normal replying
 }
 
-message Ack {
-  bool acknowledged = 1;
-}
+
 
 message replicaStatus
 {

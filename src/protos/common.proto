@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package common;
+
+import "google/protobuf/empty.proto";
+
+service HeartbeatService{
+    rpc Ping(google.protobuf.Empty) returns (Ack);
+}
+message Ack {
+  bool acknowledged = 1;
+}

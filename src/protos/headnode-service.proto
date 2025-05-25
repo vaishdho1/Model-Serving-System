@@ -1,39 +1,40 @@
 syntax = "proto3";
 
-package raylet;
+package headnode;
 
-service HeadNodeService {
- 
-  rpc CreateReplica(ReplicaCreationRequest) returns (ReplicaCreationReply); //request from headNode
-  rpc SendRequest(ReplicaRequest) returns(ReplicaReply); //request from headNode
-  rpc SendHealthStatus(HealthStatusUpdate) returns(HealthStatusReply); // request from curNode
+import "google/protobuf/empty.proto";
+import "common.proto";
+service WorkerManagementService {
+  // Worker Calls
+  rpc SendHealthStatus(HealthStatusUpdate) returns(HealthStatusReply);
+  //Worker Node calls 
   rpc RegisterNode(RegisterRequest) returns(RegisterReply);
+  //Worker Node calls
+  rpc RecordMetrics(MetricsRequest) returns (MetricsReply);
 }
 
-message ReplicaCreationRequest {
-  string base_node_address = 1; // The node which sends request: Currently only headNode is sending
-  uint32 num_resources = 2; //How many resources are used by the ReplicaCreationReply
-  string resource_name = 3; //What is the type of resources(GPU or CPU)
+service ProxyManagementService{
+    //Proxy calls this
+    rpc SubscribeToRoutingUpdates(SubscriptionRequest) returns (stream RoutingUpdate) {}
+   //HeadNode calls ping
 }
-message ReplicaCreationReply{
-  uint32 worker_id = 1; //The worker id
-  uint32 replica_id = 2;//The id of the new generated replica
-  bool created = 3;//The status of the replica
+
+
+message MetricsRequest
+{
+    uint32 worker_id = 1;
+    uint32 replica_id = 2;
+    float avg_requests = 3;
+    uint64 sent_time_stamp = 4;
+    uint32 queue_size = 5;
 }
-message Message{
-  string model = 1; //Name of the model to load.If the model already exists this will ignore
-  string input = 2;//This is the input going into the model
+message MetricsReply
+{
+  bool acknowledge = 1;
 }
-message ReplicaRequest{
-  uint32 worker_id = 1; //The worker id
-  uint32 replica_id = 2;//The id of the new generated replica
-  Message message = 3;
-}
-message ReplicaReply{
-  uint32 worker_id = 1;
-  uint32 replica_id = 2;
-  string output = 3;
-}
+
+
+
 message Resource {
   uint32 used_resources = 1; // Number of resources used
   string name = 2;           // The name of the resource
@@ -74,4 +75,38 @@ message RegisterRequest{
 }
 message RegisterReply{
   bool ack = 1;//Head Node acknowledges the system
+}
+
+// Request message when a proxy subscribes
+message SubscriptionRequest {
+  string proxy_id = 1; // To identify the proxy, useful for logging/management
+}
+
+// Represents information about a single replica
+message ReplicaInfo {
+  string replica_id = 1;      // The unique ID for this replica instance
+  string address = 2;         // The network address (e.g., "pod_ip:port") for the replica
+  //string status = 3;          // Optional: Status like "STARTING", "READY", "STOPPING"
+  // You can add more replica-specific metadata here, like node_id, zone, etc.
+}
+
+// Represents the data attributes of your DeploymentHandle class
+// Renamed to DeploymentInfoMessage for clarity, but you can keep DeploymentHandleMessage
+message DeploymentInfoMessage {
+  string deployment_id = 1;     // The unique ID for the deployment (your dep_id)
+  string endpoint = 2;   // The endpoint for this deployment
+  string version = 3;           // The version of the code/config being run
+  string status = 4;            // Overall status of the deployment
+
+  // A list containing all active/known replicas for this deployment
+  repeated ReplicaInfo replicas = 5;
+}
+
+// The update message streamed to proxies
+message RoutingUpdate {
+  //int64 version = 1;                  // Overall version of this routing snapshot
+  // Key: deployment_id (string), Value: DeploymentInfoMessage
+  // This map holds multiple 'dep_id: DeploymentHandle' pairs
+  map<string, DeploymentInfoMessage> current_deployments = 2;
+  int64 timestamp_ns = 3;             // Nanoseconds since epoch for the update
 }

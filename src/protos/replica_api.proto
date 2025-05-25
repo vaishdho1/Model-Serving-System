@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package replica;
+
+import "google/protobuf/empty.proto";
+import "common.proto";
+
+
+service WorkerManagementService{
+    rpc PushTask(TaskRequest) returns (TaskReply);
+    //Ping from the workerNode
+}
+
+message TaskRequest {
+  string model = 1; //Name of the model to load.If the model already exists this will ignore
+  string input = 2;//This is the input going into the model
+}
+message TaskReply {
+  // Fields returned by the worker
+  string result = 1; //Result of the prompt/input
+}

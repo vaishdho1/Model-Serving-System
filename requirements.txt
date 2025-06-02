@@ -1,3 +1,13 @@
 grpcio
 protobuf
 grpcio-tools 
+fastapi
+uvicorn
+httpx
+aiohttp
+requests
+starlette
+numpy
+torch
+transformers
+accelerate

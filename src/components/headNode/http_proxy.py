@@ -49,12 +49,6 @@ class HttpProxy():
         self.subscription_task = asyncio.create_task(self.subscribe_to_head_node())
         print(f"[HttpProxy:{self.proxy_id}] Initialized. Listening for HeadController on port {parent_port}.")
     
-    def endpoint_to_deployment_name(self, endpoint: str) -> str:
-        """Map endpoint path to deployment name using model config"""
-        model_config = model_config_manager.get_model_config_by_endpoint(endpoint)
-        if model_config:
-            return model_config.deployment_name
-        return None
     
     async def close(self):
         """Gracefully close resources."""

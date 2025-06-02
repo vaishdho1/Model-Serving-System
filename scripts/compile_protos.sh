@@ -22,10 +22,11 @@ echo "Protobuf compilation finished."
 
 # Create __init__.py files if they don't exist, to make the generated directory a package
 touch "${GENERATED_DIR}/__init__.py"
-# If you have subdirectories in protos that are also reflected in generated,
-# you might need to create __init__.py in those subdirectories as well.
-# For example, if protos/subdir/file.proto generates generated/subdir/file_pb2.py:
-# find "${GENERATED_DIR}" -type d -exec touch {}/__init__.py \;
-# However, for a flat 'generated' structure, the above line is sufficient.
 
-echo "Created __init__.py in ${GENERATED_DIR}." 
+echo "Created __init__.py in ${GENERATED_DIR}."
+
+# Fix imports in generated files
+echo "Fixing protobuf imports..."
+python scripts/fix_protobuf_imports.py
+
+echo "Protobuf compilation and import fixing completed." 

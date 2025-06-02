@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package headnode;
+package protos;
 
 import "google/protobuf/empty.proto";
 import "common.proto";
@@ -16,7 +16,6 @@ service WorkerManagementService {
 service ProxyManagementService{
     //Proxy calls this
     rpc SubscribeToRoutingUpdates(SubscriptionRequest) returns (stream RoutingUpdate) {}
-   //HeadNode calls ping
 }
 
 
@@ -35,29 +34,18 @@ message MetricsReply
 
 
 
-message Resource {
-  uint32 used_resources = 1; // Number of resources used
-  string name = 2;           // The name of the resource
-  string state = 3;          // One of running, idle, killed
-  uint32 queue_length = 4;     // Number of active requests in queue
-}
+
 
 message ReplicaState
 {
   uint32 replica_id = 1;
-  uint32 queue_size = 2;
+  uint32 deployment_id = 2; //What deployment this belongs to
   string status = 3; //Whether the actor is dead or alive
 }
-/*
-message HealthStatusUpdate {
-  uint32 worker_id = 1;    // The worker ID
-  uint32 replica_id = 2;   // The ID of the new generated replica
-  Resource resource = 3;   // A single resource object
-}
-*/
+
 message HealthStatusUpdate {
   uint32 worker_id = 1; // The worker ID
-  string state = 2; // Worker state
+  //string state = 2; // Worker state
   repeated ReplicaState replica_states = 3;
 }
 
@@ -67,11 +55,16 @@ message HealthStatusReply {
   string isAlive = 2; // This is a message from headNode which says whether the worker node is stillAlive
                       //if not the worker node needs to be killed by the worker node
 }
+message Resource{
+  uint32 num_cpus = 1; //Number of cpus alloted to the node
+  uint32 num_gpus = 2;//Number of gpus alloted to the node
+}
 message RegisterRequest{
   uint32 node_id = 1; //ID of the current node, this is handled in the beginning
   string node_address = 2;//Address of the node
   string port = 3;//Port where the worker starts
   string state = 4;//Status of the Node at start up
+  Resource resource = 5; //The resources alloted to the node
 }
 message RegisterReply{
   bool ack = 1;//Head Node acknowledges the system
@@ -86,6 +79,7 @@ message SubscriptionRequest {
 message ReplicaInfo {
   string replica_id = 1;      // The unique ID for this replica instance
   string address = 2;         // The network address (e.g., "pod_ip:port") for the replica
+  string state = 3; // The state of the replica
   //string status = 3;          // Optional: Status like "STARTING", "READY", "STOPPING"
   // You can add more replica-specific metadata here, like node_id, zone, etc.
 }
@@ -93,8 +87,8 @@ message ReplicaInfo {
 // Represents the data attributes of your DeploymentHandle class
 // Renamed to DeploymentInfoMessage for clarity, but you can keep DeploymentHandleMessage
 message DeploymentInfoMessage {
-  string deployment_id = 1;     // The unique ID for the deployment (your dep_id)
-  string endpoint = 2;   // The endpoint for this deployment
+  uint32 deployment_id = 1;     // The unique ID for the deployment (your dep_id)
+  string deployment_name = 2;   // The endpoint for this deployment
   string version = 3;           // The version of the code/config being run
   string status = 4;            // Overall status of the deployment
 
@@ -105,8 +99,8 @@ message DeploymentInfoMessage {
 // The update message streamed to proxies
 message RoutingUpdate {
   //int64 version = 1;                  // Overall version of this routing snapshot
-  // Key: deployment_id (string), Value: DeploymentInfoMessage
+  // Key: deployment_id (uint32), Value: DeploymentInfoMessage
   // This map holds multiple 'dep_id: DeploymentHandle' pairs
-  map<string, DeploymentInfoMessage> current_deployments = 2;
+  map<uint32, DeploymentInfoMessage> current_deployments = 2;
   int64 timestamp_ns = 3;             // Nanoseconds since epoch for the update
 }

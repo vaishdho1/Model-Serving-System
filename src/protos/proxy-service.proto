@@ -1,0 +1,8 @@
+syntax = "proto3";
+import "common.proto";
+package protos;
+import "google/protobuf/empty.proto";
+// Single‐method service
+service HealthService {
+   rpc Ping(google.protobuf.Empty) returns (Ack);
+}

@@ -4,7 +4,7 @@
 
 This project implements a **basic functional** distributed model serving system designed to manage and serve LLMs efficiently. The system consists of a head controller for coordination, scheduler nodes that manage replica processes, HTTP proxy for client access, and replica processes that run actual models. The system uses gRPC for internal communication and HTTP for client access, with robust fault tolerance, automatic restart capabilities, and support for multiple deployment scenarios.
 
-## Current Status: **BASIC FULL FLOW UP** 
+## Current Status: ***BASIC FULL FLOW UP***
 The system is not fully ready but the basic functionalities are up.
 
 ## Core Features Implemented
@@ -16,7 +16,7 @@ The system is not fully ready but the basic functionalities are up.
 - **Dynamic Replica Management**: Automatic creation and scaling of model replicas
 
 ### **Model Support**
-- **Multiple Models**:Basic testing with GPT-2, TinyLlama, Phi-2, Mistral-7B, CodeLlama, Llama-2
+- **Multiple Models**:Basic testing with GPT-2, TinyLlama, Phi-2
 - **Configurable Parameters**: Temperature, max_length, top_p per model
 - **Model Configuration Management**: Centralized config via `model_configs.json`
 
@@ -96,13 +96,7 @@ curl -X POST http://localhost:8000/v1/chat/tinyllama \
 - TinyLlama | `/v1/chat/tinyllama` 
 - Phi-2 | `/v1/chat/phi2` 
 - CodeLlama | `/v1/code/codellama` 
- |
-
-### Logging Files
-- `proxy.log`: HTTP proxy activity
-- `replica_N.log`: Individual replica logs
-- Terminal output: Real-time system status
-
+ 
 
 ### Planned Features
 
@@ -116,5 +110,4 @@ curl -X POST http://localhost:8000/v1/chat/tinyllama \
 
 
 
-
-*(Note: The files are not ready for deployment yet. Running these would only bring basic flow)* 
+*(Note: The files are not ready for deployment yet. Running these would only bring up basic flow)* 

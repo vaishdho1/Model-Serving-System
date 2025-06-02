@@ -22,37 +22,47 @@ _runtime_version.ValidateProtobufRuntimeVersion(
 _sym_db = _symbol_database.Default()
 
 
+from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
+from . import common_pb2 as common__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x16headnode-service.proto\x12\x06raylet\"a\n\x16ReplicaCreationRequest\x12\x19\n\x11\x62\x61se_node_address\x18\x01 \x01(\t\x12\x15\n\rnum_resources\x18\x02 \x01(\r\x12\x15\n\rresource_name\x18\x03 \x01(\t\"N\n\x14ReplicaCreationReply\x12\x11\n\tworker_id\x18\x01 \x01(\r\x12\x12\n\nreplica_id\x18\x02 \x01(\r\x12\x0f\n\x07\x63reated\x18\x03 \x01(\x08\"\'\n\x07Message\x12\r\n\x05model\x18\x01 \x01(\t\x12\r\n\x05input\x18\x02 \x01(\t\"Y\n\x0eReplicaRequest\x12\x11\n\tworker_id\x18\x01 \x01(\r\x12\x12\n\nreplica_id\x18\x02 \x01(\r\x12 \n\x07message\x18\x03 \x01(\x0b\x32\x0f.raylet.Message\"E\n\x0cReplicaReply\x12\x11\n\tworker_id\x18\x01 \x01(\r\x12\x12\n\nreplica_id\x18\x02 \x01(\r\x12\x0e\n\x06output\x18\x03 \x01(\t\"U\n\x08Resource\x12\x16\n\x0eused_resources\x18\x01 \x01(\r\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\r\n\x05state\x18\x03 \x01(\t\x12\x14\n\x0cqueue_length\x18\x04 \x01(\r\"F\n\x0cReplicaState\x12\x12\n\nreplica_id\x18\x01 \x01(\r\x12\x12\n\nqueue_size\x18\x02 \x01(\r\x12\x0e\n\x06status\x18\x03 \x01(\t\"d\n\x12HealthStatusUpdate\x12\x11\n\tworker_id\x18\x01 \x01(\r\x12\r\n\x05state\x18\x02 \x01(\t\x12,\n\x0ereplica_states\x18\x03 \x03(\x0b\x32\x14.raylet.ReplicaState\"1\n\x11HealthStatusReply\x12\x0b\n\x03\x61\x63k\x18\x01 \x01(\x08\x12\x0f\n\x07isAlive\x18\x02 \x01(\t\"U\n\x0fRegisterRequest\x12\x0f\n\x07node_id\x18\x01 \x01(\r\x12\x14\n\x0cnode_address\x18\x02 \x01(\t\x12\x0c\n\x04port\x18\x03 \x01(\t\x12\r\n\x05state\x18\x04 \x01(\t\"\x1c\n\rRegisterReply\x12\x0b\n\x03\x61\x63k\x18\x01 \x01(\x08\x32\xa8\x02\n\x0fHeadNodeService\x12M\n\rCreateReplica\x12\x1e.raylet.ReplicaCreationRequest\x1a\x1c.raylet.ReplicaCreationReply\x12;\n\x0bSendRequest\x12\x16.raylet.ReplicaRequest\x1a\x14.raylet.ReplicaReply\x12I\n\x10SendHealthStatus\x12\x1a.raylet.HealthStatusUpdate\x1a\x19.raylet.HealthStatusReply\x12>\n\x0cRegisterNode\x12\x17.raylet.RegisterRequest\x1a\x15.raylet.RegisterReplyb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x16headnode-service.proto\x12\x06protos\x1a\x1bgoogle/protobuf/empty.proto\x1a\x0c\x63ommon.proto\"z\n\x0eMetricsRequest\x12\x11\n\tworker_id\x18\x01 \x01(\r\x12\x12\n\nreplica_id\x18\x02 \x01(\r\x12\x14\n\x0c\x61vg_requests\x18\x03 \x01(\x02\x12\x17\n\x0fsent_time_stamp\x18\x04 \x01(\x04\x12\x12\n\nqueue_size\x18\x05 \x01(\r\"#\n\x0cMetricsReply\x12\x13\n\x0b\x61\x63knowledge\x18\x01 \x01(\x08\"I\n\x0cReplicaState\x12\x12\n\nreplica_id\x18\x01 \x01(\r\x12\x15\n\rdeployment_id\x18\x02 \x01(\r\x12\x0e\n\x06status\x18\x03 \x01(\t\"U\n\x12HealthStatusUpdate\x12\x11\n\tworker_id\x18\x01 \x01(\r\x12,\n\x0ereplica_states\x18\x03 \x03(\x0b\x32\x14.protos.ReplicaState\"1\n\x11HealthStatusReply\x12\x0b\n\x03\x61\x63k\x18\x01 \x01(\x08\x12\x0f\n\x07isAlive\x18\x02 \x01(\t\".\n\x08Resource\x12\x10\n\x08num_cpus\x18\x01 \x01(\r\x12\x10\n\x08num_gpus\x18\x02 \x01(\r\"y\n\x0fRegisterRequest\x12\x0f\n\x07node_id\x18\x01 \x01(\r\x12\x14\n\x0cnode_address\x18\x02 \x01(\t\x12\x0c\n\x04port\x18\x03 \x01(\t\x12\r\n\x05state\x18\x04 \x01(\t\x12\"\n\x08resource\x18\x05 \x01(\x0b\x32\x10.protos.Resource\"\x1c\n\rRegisterReply\x12\x0b\n\x03\x61\x63k\x18\x01 \x01(\x08\"\'\n\x13SubscriptionRequest\x12\x10\n\x08proxy_id\x18\x01 \x01(\t\"A\n\x0bReplicaInfo\x12\x12\n\nreplica_id\x18\x01 \x01(\t\x12\x0f\n\x07\x61\x64\x64ress\x18\x02 \x01(\t\x12\r\n\x05state\x18\x03 \x01(\t\"\x8f\x01\n\x15\x44\x65ploymentInfoMessage\x12\x15\n\rdeployment_id\x18\x01 \x01(\r\x12\x17\n\x0f\x64\x65ployment_name\x18\x02 \x01(\t\x12\x0f\n\x07version\x18\x03 \x01(\t\x12\x0e\n\x06status\x18\x04 \x01(\t\x12%\n\x08replicas\x18\x05 \x03(\x0b\x32\x13.protos.ReplicaInfo\"\xcb\x01\n\rRoutingUpdate\x12J\n\x13\x63urrent_deployments\x18\x02 \x03(\x0b\x32-.protos.RoutingUpdate.CurrentDeploymentsEntry\x12\x14\n\x0ctimestamp_ns\x18\x03 \x01(\x03\x1aX\n\x17\x43urrentDeploymentsEntry\x12\x0b\n\x03key\x18\x01 \x01(\r\x12,\n\x05value\x18\x02 \x01(\x0b\x32\x1d.protos.DeploymentInfoMessage:\x02\x38\x01\x32\xe3\x01\n\x17WorkerManagementService\x12I\n\x10SendHealthStatus\x12\x1a.protos.HealthStatusUpdate\x1a\x19.protos.HealthStatusReply\x12>\n\x0cRegisterNode\x12\x17.protos.RegisterRequest\x1a\x15.protos.RegisterReply\x12=\n\rRecordMetrics\x12\x16.protos.MetricsRequest\x1a\x14.protos.MetricsReply2m\n\x16ProxyManagementService\x12S\n\x19SubscribeToRoutingUpdates\x12\x1b.protos.SubscriptionRequest\x1a\x15.protos.RoutingUpdate\"\x00\x30\x01\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'headnode_service_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
-  _globals['_REPLICACREATIONREQUEST']._serialized_start=34
-  _globals['_REPLICACREATIONREQUEST']._serialized_end=131
-  _globals['_REPLICACREATIONREPLY']._serialized_start=133
-  _globals['_REPLICACREATIONREPLY']._serialized_end=211
-  _globals['_MESSAGE']._serialized_start=213
-  _globals['_MESSAGE']._serialized_end=252
-  _globals['_REPLICAREQUEST']._serialized_start=254
-  _globals['_REPLICAREQUEST']._serialized_end=343
-  _globals['_REPLICAREPLY']._serialized_start=345
-  _globals['_REPLICAREPLY']._serialized_end=414
-  _globals['_RESOURCE']._serialized_start=416
-  _globals['_RESOURCE']._serialized_end=501
-  _globals['_REPLICASTATE']._serialized_start=503
-  _globals['_REPLICASTATE']._serialized_end=573
-  _globals['_HEALTHSTATUSUPDATE']._serialized_start=575
-  _globals['_HEALTHSTATUSUPDATE']._serialized_end=675
-  _globals['_HEALTHSTATUSREPLY']._serialized_start=677
-  _globals['_HEALTHSTATUSREPLY']._serialized_end=726
-  _globals['_REGISTERREQUEST']._serialized_start=728
-  _globals['_REGISTERREQUEST']._serialized_end=813
-  _globals['_REGISTERREPLY']._serialized_start=815
-  _globals['_REGISTERREPLY']._serialized_end=843
-  _globals['_HEADNODESERVICE']._serialized_start=846
-  _globals['_HEADNODESERVICE']._serialized_end=1142
+  _globals['_ROUTINGUPDATE_CURRENTDEPLOYMENTSENTRY']._loaded_options = None
+  _globals['_ROUTINGUPDATE_CURRENTDEPLOYMENTSENTRY']._serialized_options = b'8\001'
+  _globals['_METRICSREQUEST']._serialized_start=77
+  _globals['_METRICSREQUEST']._serialized_end=199
+  _globals['_METRICSREPLY']._serialized_start=201
+  _globals['_METRICSREPLY']._serialized_end=236
+  _globals['_REPLICASTATE']._serialized_start=238
+  _globals['_REPLICASTATE']._serialized_end=311
+  _globals['_HEALTHSTATUSUPDATE']._serialized_start=313
+  _globals['_HEALTHSTATUSUPDATE']._serialized_end=398
+  _globals['_HEALTHSTATUSREPLY']._serialized_start=400
+  _globals['_HEALTHSTATUSREPLY']._serialized_end=449
+  _globals['_RESOURCE']._serialized_start=451
+  _globals['_RESOURCE']._serialized_end=497
+  _globals['_REGISTERREQUEST']._serialized_start=499
+  _globals['_REGISTERREQUEST']._serialized_end=620
+  _globals['_REGISTERREPLY']._serialized_start=622
+  _globals['_REGISTERREPLY']._serialized_end=650
+  _globals['_SUBSCRIPTIONREQUEST']._serialized_start=652
+  _globals['_SUBSCRIPTIONREQUEST']._serialized_end=691
+  _globals['_REPLICAINFO']._serialized_start=693
+  _globals['_REPLICAINFO']._serialized_end=758
+  _globals['_DEPLOYMENTINFOMESSAGE']._serialized_start=761
+  _globals['_DEPLOYMENTINFOMESSAGE']._serialized_end=904
+  _globals['_ROUTINGUPDATE']._serialized_start=907
+  _globals['_ROUTINGUPDATE']._serialized_end=1110
+  _globals['_ROUTINGUPDATE_CURRENTDEPLOYMENTSENTRY']._serialized_start=1022
+  _globals['_ROUTINGUPDATE_CURRENTDEPLOYMENTSENTRY']._serialized_end=1110
+  _globals['_WORKERMANAGEMENTSERVICE']._serialized_start=1113
+  _globals['_WORKERMANAGEMENTSERVICE']._serialized_end=1340
+  _globals['_PROXYMANAGEMENTSERVICE']._serialized_start=1342
+  _globals['_PROXYMANAGEMENTSERVICE']._serialized_end=1451
 # @@protoc_insertion_point(module_scope)

@@ -23,29 +23,34 @@ _sym_db = _symbol_database.Default()
 
 
 from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
+from . import common_pb2 as common__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x14worker-service.proto\x12\x06worker\x1a\x1bgoogle/protobuf/empty.proto\"+\n\x0bTaskRequest\x12\r\n\x05model\x18\x01 \x01(\t\x12\r\n\x05input\x18\x02 \x01(\t\"\x1b\n\tTaskReply\x12\x0e\n\x06result\x18\x01 \x01(\t\"2\n\x0cHealthStatus\x12\x0e\n\x06status\x18\x01 \x01(\t\x12\x12\n\nreplica_id\x18\x02 \x01(\r\"\x1a\n\x0bHealthReply\x12\x0b\n\x03\x61\x63k\x18\x01 \x01(\x08\"\x1b\n\x03\x41\x63k\x12\x14\n\x0c\x61\x63knowledged\x18\x01 \x01(\x08\"M\n\rreplicaStatus\x12\r\n\x05state\x18\x01 \x01(\t\x12\x12\n\nreplica_id\x18\x02 \x01(\r\x12\x0b\n\x03pid\x18\x03 \x01(\r\x12\x0c\n\x04port\x18\x04 \x01(\t\"\x14\n\x05Reply\x12\x0b\n\x03\x61\x63k\x18\x01 \x01(\x08\x32\xe8\x01\n\rWorkerService\x12\x32\n\x08PushTask\x12\x13.worker.TaskRequest\x1a\x11.worker.TaskReply\x12=\n\x10sendHealthupdate\x12\x14.worker.HealthStatus\x1a\x13.worker.HealthReply\x12\x37\n\x0fRegisterReplica\x12\x15.worker.replicaStatus\x1a\r.worker.Reply\x12+\n\x04Ping\x12\x16.google.protobuf.Empty\x1a\x0b.worker.Ackb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x14worker-service.proto\x12\x06protos\x1a\x1bgoogle/protobuf/empty.proto\x1a\x0c\x63ommon.proto\"\x87\x01\n\x16ReplicaCreationRequest\x12\x19\n\x11\x62\x61se_node_address\x18\x01 \x01(\t\x12\x15\n\rdeployment_id\x18\x05 \x01(\r\x12\x10\n\x08num_cpus\x18\x02 \x01(\r\x12\x10\n\x08num_gpus\x18\x03 \x01(\r\x12\x17\n\x0f\x64\x65ployment_name\x18\x04 \x01(\t\"N\n\x14ReplicaCreationReply\x12\x11\n\tworker_id\x18\x01 \x01(\r\x12\x12\n\nreplica_id\x18\x02 \x01(\r\x12\x0f\n\x07\x63reated\x18\x03 \x01(\x08\"F\n\x0eReplicaRequest\x12\x11\n\tworker_id\x18\x01 \x01(\r\x12\x12\n\nreplica_id\x18\x02 \x01(\r\x12\r\n\x05input\x18\x03 \x01(\t\"0\n\x0cReplicaReply\x12\x0e\n\x06output\x18\x01 \x01(\t\x12\x10\n\x08is_error\x18\x02 \x01(\x08\"2\n\x0cHealthStatus\x12\x0e\n\x06status\x18\x01 \x01(\t\x12\x12\n\nreplica_id\x18\x02 \x01(\r\"\x1a\n\x0bHealthReply\x12\x0b\n\x03\x61\x63k\x18\x01 \x01(\x08\"d\n\rreplicaStatus\x12\r\n\x05state\x18\x01 \x01(\t\x12\x12\n\nreplica_id\x18\x02 \x01(\r\x12\x0b\n\x03pid\x18\x03 \x01(\r\x12\x0c\n\x04port\x18\x04 \x01(\t\x12\x15\n\rdeployment_id\x18\x05 \x01(\r\"\x14\n\x05Reply\x12\x0b\n\x03\x61\x63k\x18\x01 \x01(\x08\x32\xb5\x01\n\x0eReplicaService\x12=\n\x10sendHealthupdate\x12\x14.protos.HealthStatus\x1a\x13.protos.HealthReply\x12\x37\n\x0fRegisterReplica\x12\x15.protos.replicaStatus\x1a\r.protos.Reply\x12+\n\x04Ping\x12\x16.google.protobuf.Empty\x1a\x0b.protos.Ack2\x9f\x01\n\x0fHeadNodeService\x12M\n\rCreateReplica\x12\x1e.protos.ReplicaCreationRequest\x1a\x1c.protos.ReplicaCreationReply\x12=\n\x0bSendRequest\x12\x16.protos.ReplicaRequest\x1a\x14.protos.ReplicaReply0\x01\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'worker_service_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
-  _globals['_TASKREQUEST']._serialized_start=61
-  _globals['_TASKREQUEST']._serialized_end=104
-  _globals['_TASKREPLY']._serialized_start=106
-  _globals['_TASKREPLY']._serialized_end=133
-  _globals['_HEALTHSTATUS']._serialized_start=135
-  _globals['_HEALTHSTATUS']._serialized_end=185
-  _globals['_HEALTHREPLY']._serialized_start=187
-  _globals['_HEALTHREPLY']._serialized_end=213
-  _globals['_ACK']._serialized_start=215
-  _globals['_ACK']._serialized_end=242
-  _globals['_REPLICASTATUS']._serialized_start=244
-  _globals['_REPLICASTATUS']._serialized_end=321
-  _globals['_REPLY']._serialized_start=323
-  _globals['_REPLY']._serialized_end=343
-  _globals['_WORKERSERVICE']._serialized_start=346
-  _globals['_WORKERSERVICE']._serialized_end=578
+  _globals['_REPLICACREATIONREQUEST']._serialized_start=76
+  _globals['_REPLICACREATIONREQUEST']._serialized_end=211
+  _globals['_REPLICACREATIONREPLY']._serialized_start=213
+  _globals['_REPLICACREATIONREPLY']._serialized_end=291
+  _globals['_REPLICAREQUEST']._serialized_start=293
+  _globals['_REPLICAREQUEST']._serialized_end=363
+  _globals['_REPLICAREPLY']._serialized_start=365
+  _globals['_REPLICAREPLY']._serialized_end=413
+  _globals['_HEALTHSTATUS']._serialized_start=415
+  _globals['_HEALTHSTATUS']._serialized_end=465
+  _globals['_HEALTHREPLY']._serialized_start=467
+  _globals['_HEALTHREPLY']._serialized_end=493
+  _globals['_REPLICASTATUS']._serialized_start=495
+  _globals['_REPLICASTATUS']._serialized_end=595
+  _globals['_REPLY']._serialized_start=597
+  _globals['_REPLY']._serialized_end=617
+  _globals['_REPLICASERVICE']._serialized_start=620
+  _globals['_REPLICASERVICE']._serialized_end=801
+  _globals['_HEADNODESERVICE']._serialized_start=804
+  _globals['_HEADNODESERVICE']._serialized_end=963
 # @@protoc_insertion_point(module_scope)

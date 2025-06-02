@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-import headnode_service_pb2 as headnode__service__pb2
+from . import headnode_service_pb2 as headnode__service__pb2
 
 GRPC_GENERATED_VERSION = '1.71.0'
 GRPC_VERSION = grpc.__version__
@@ -25,7 +25,7 @@ if _version_not_supported:
     )
 
 
-class HeadNodeServiceStub(object):
+class WorkerManagementServiceStub(object):
     """Missing associated documentation comment in .proto file."""
 
     def __init__(self, channel):
@@ -34,71 +34,50 @@ class HeadNodeServiceStub(object):
         Args:
             channel: A grpc.Channel.
         """
-        self.CreateReplica = channel.unary_unary(
-                '/raylet.HeadNodeService/CreateReplica',
-                request_serializer=headnode__service__pb2.ReplicaCreationRequest.SerializeToString,
-                response_deserializer=headnode__service__pb2.ReplicaCreationReply.FromString,
-                _registered_method=True)
-        self.SendRequest = channel.unary_unary(
-                '/raylet.HeadNodeService/SendRequest',
-                request_serializer=headnode__service__pb2.ReplicaRequest.SerializeToString,
-                response_deserializer=headnode__service__pb2.ReplicaReply.FromString,
-                _registered_method=True)
         self.SendHealthStatus = channel.unary_unary(
-                '/raylet.HeadNodeService/SendHealthStatus',
+                '/protos.WorkerManagementService/SendHealthStatus',
                 request_serializer=headnode__service__pb2.HealthStatusUpdate.SerializeToString,
                 response_deserializer=headnode__service__pb2.HealthStatusReply.FromString,
                 _registered_method=True)
         self.RegisterNode = channel.unary_unary(
-                '/raylet.HeadNodeService/RegisterNode',
+                '/protos.WorkerManagementService/RegisterNode',
                 request_serializer=headnode__service__pb2.RegisterRequest.SerializeToString,
                 response_deserializer=headnode__service__pb2.RegisterReply.FromString,
                 _registered_method=True)
+        self.RecordMetrics = channel.unary_unary(
+                '/protos.WorkerManagementService/RecordMetrics',
+                request_serializer=headnode__service__pb2.MetricsRequest.SerializeToString,
+                response_deserializer=headnode__service__pb2.MetricsReply.FromString,
+                _registered_method=True)
 
 
-class HeadNodeServiceServicer(object):
+class WorkerManagementServiceServicer(object):
     """Missing associated documentation comment in .proto file."""
 
-    def CreateReplica(self, request, context):
-        """request from headNode
-        """
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def SendRequest(self, request, context):
-        """request from headNode
-        """
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
     def SendHealthStatus(self, request, context):
-        """request from curNode
+        """Worker Calls
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def RegisterNode(self, request, context):
-        """Missing associated documentation comment in .proto file."""
+        """Worker Node calls 
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def RecordMetrics(self, request, context):
+        """Worker Node calls
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
 
-def add_HeadNodeServiceServicer_to_server(servicer, server):
+def add_WorkerManagementServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
-            'CreateReplica': grpc.unary_unary_rpc_method_handler(
-                    servicer.CreateReplica,
-                    request_deserializer=headnode__service__pb2.ReplicaCreationRequest.FromString,
-                    response_serializer=headnode__service__pb2.ReplicaCreationReply.SerializeToString,
-            ),
-            'SendRequest': grpc.unary_unary_rpc_method_handler(
-                    servicer.SendRequest,
-                    request_deserializer=headnode__service__pb2.ReplicaRequest.FromString,
-                    response_serializer=headnode__service__pb2.ReplicaReply.SerializeToString,
-            ),
             'SendHealthStatus': grpc.unary_unary_rpc_method_handler(
                     servicer.SendHealthStatus,
                     request_deserializer=headnode__service__pb2.HealthStatusUpdate.FromString,
@@ -109,70 +88,21 @@ def add_HeadNodeServiceServicer_to_server(servicer, server):
                     request_deserializer=headnode__service__pb2.RegisterRequest.FromString,
                     response_serializer=headnode__service__pb2.RegisterReply.SerializeToString,
             ),
+            'RecordMetrics': grpc.unary_unary_rpc_method_handler(
+                    servicer.RecordMetrics,
+                    request_deserializer=headnode__service__pb2.MetricsRequest.FromString,
+                    response_serializer=headnode__service__pb2.MetricsReply.SerializeToString,
+            ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
-            'raylet.HeadNodeService', rpc_method_handlers)
+            'protos.WorkerManagementService', rpc_method_handlers)
     server.add_generic_rpc_handlers((generic_handler,))
-    server.add_registered_method_handlers('raylet.HeadNodeService', rpc_method_handlers)
+    server.add_registered_method_handlers('protos.WorkerManagementService', rpc_method_handlers)
 
 
  # This class is part of an EXPERIMENTAL API.
-class HeadNodeService(object):
+class WorkerManagementService(object):
     """Missing associated documentation comment in .proto file."""
-
-    @staticmethod
-    def CreateReplica(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/raylet.HeadNodeService/CreateReplica',
-            headnode__service__pb2.ReplicaCreationRequest.SerializeToString,
-            headnode__service__pb2.ReplicaCreationReply.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def SendRequest(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/raylet.HeadNodeService/SendRequest',
-            headnode__service__pb2.ReplicaRequest.SerializeToString,
-            headnode__service__pb2.ReplicaReply.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
 
     @staticmethod
     def SendHealthStatus(request,
@@ -188,7 +118,7 @@ class HeadNodeService(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/raylet.HeadNodeService/SendHealthStatus',
+            '/protos.WorkerManagementService/SendHealthStatus',
             headnode__service__pb2.HealthStatusUpdate.SerializeToString,
             headnode__service__pb2.HealthStatusReply.FromString,
             options,
@@ -215,9 +145,109 @@ class HeadNodeService(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/raylet.HeadNodeService/RegisterNode',
+            '/protos.WorkerManagementService/RegisterNode',
             headnode__service__pb2.RegisterRequest.SerializeToString,
             headnode__service__pb2.RegisterReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RecordMetrics(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/protos.WorkerManagementService/RecordMetrics',
+            headnode__service__pb2.MetricsRequest.SerializeToString,
+            headnode__service__pb2.MetricsReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+
+class ProxyManagementServiceStub(object):
+    """Missing associated documentation comment in .proto file."""
+
+    def __init__(self, channel):
+        """Constructor.
+
+        Args:
+            channel: A grpc.Channel.
+        """
+        self.SubscribeToRoutingUpdates = channel.unary_stream(
+                '/protos.ProxyManagementService/SubscribeToRoutingUpdates',
+                request_serializer=headnode__service__pb2.SubscriptionRequest.SerializeToString,
+                response_deserializer=headnode__service__pb2.RoutingUpdate.FromString,
+                _registered_method=True)
+
+
+class ProxyManagementServiceServicer(object):
+    """Missing associated documentation comment in .proto file."""
+
+    def SubscribeToRoutingUpdates(self, request, context):
+        """Proxy calls this
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+
+def add_ProxyManagementServiceServicer_to_server(servicer, server):
+    rpc_method_handlers = {
+            'SubscribeToRoutingUpdates': grpc.unary_stream_rpc_method_handler(
+                    servicer.SubscribeToRoutingUpdates,
+                    request_deserializer=headnode__service__pb2.SubscriptionRequest.FromString,
+                    response_serializer=headnode__service__pb2.RoutingUpdate.SerializeToString,
+            ),
+    }
+    generic_handler = grpc.method_handlers_generic_handler(
+            'protos.ProxyManagementService', rpc_method_handlers)
+    server.add_generic_rpc_handlers((generic_handler,))
+    server.add_registered_method_handlers('protos.ProxyManagementService', rpc_method_handlers)
+
+
+ # This class is part of an EXPERIMENTAL API.
+class ProxyManagementService(object):
+    """Missing associated documentation comment in .proto file."""
+
+    @staticmethod
+    def SubscribeToRoutingUpdates(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(
+            request,
+            target,
+            '/protos.ProxyManagementService/SubscribeToRoutingUpdates',
+            headnode__service__pb2.SubscriptionRequest.SerializeToString,
+            headnode__service__pb2.RoutingUpdate.FromString,
             options,
             channel_credentials,
             insecure,

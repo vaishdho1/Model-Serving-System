@@ -1,0 +1,53 @@
+# firewalls.yaml
+resources:
+  # 1) Scheduler gRPC on port 50051
+  - name: allow-scheduler-grpc
+    type: compute.v1.firewall
+    properties:
+      network: global/networks/default
+      direction: INGRESS
+      priority: 1000
+      allowed:
+        - IPProtocol: tcp
+          ports:
+            - "50051"
+      sourceRanges:
+        - 0.0.0.0/0
+      targetTags:
+        - scheduler
+
+  # 2) Head HTTP on port 8000
+  - name: allow-head-http
+    type: compute.v1.firewall
+    properties:
+      network: global/networks/default
+      direction: INGRESS
+      priority: 1000
+      allowed:
+        - IPProtocol: tcp
+          ports:
+            - "8000"
+      sourceRanges:
+        - 0.0.0.0/0
+      targetTags:
+        - head-controller
+
+  # 3) Head gRPC on port 50056
+  - name: allow-head-grpc
+    type: compute.v1.firewall
+    properties:
+      network: global/networks/default
+      direction: INGRESS
+      priority: 1000
+      allowed:
+        - IPProtocol: tcp
+          ports:
+            - "50056"
+      sourceRanges:
+        - 0.0.0.0/0
+      targetTags:
+        - head-controller
+  # In firewalls.yaml
+
+
+

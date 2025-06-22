@@ -1,0 +1,56 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Security Groups for the Model Serving application, including the
+  Head Controller and the Scheduler workers.
+
+Parameters:
+  # NEW: Add a parameter to specify the VPC
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: The ID of the VPC to create the security groups in. Choose your default VPC.
+
+  
+Resources:
+  # Security Group for the Head Controller instance
+  HeadControllerSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allows HTTP, gRPC, and SSH for the head controller
+      VpcId: !Ref VpcId 
+      SecurityGroupIngress:
+        # Rules remain the same
+        - IpProtocol: tcp
+          FromPort: 8000
+          ToPort: 8000
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 50056
+          ToPort: 50056
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: head-controller-sg
+
+  # Security Group for the Scheduler worker instances
+  SchedulerSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allows gRPC and SSH for scheduler worker VMs
+      VpcId: !Ref VpcId 
+      SecurityGroupIngress:
+        # Rules remain the same
+        - IpProtocol: tcp
+          FromPort: 50051
+          ToPort: 50051
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: scheduler-sg
+
+Outputs:
+  HeadControllerSGId:
+    Description: "ID of the Head Controller Security Group"
+    Value: !GetAtt HeadControllerSG.GroupId
+  SchedulerSGId:
+    Description: "ID of the Scheduler Security Group"
+    Value: !GetAtt SchedulerSG.GroupId

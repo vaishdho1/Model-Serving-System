@@ -1,0 +1,36 @@
+# Dockerfile.scheduler
+
+# 1. Start from an official NVIDIA CUDA image to get drivers and libraries.
+# This is an excellent choice as it matches the CUDA version for PyTorch and vLLM.
+FROM nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04
+
+# 2. Set environment to non-interactive to prevent prompts during installation.
+ENV DEBIAN_FRONTEND=noninteractive
+
+# 3. Install Python 3.10, pip, and other essentials on top of the base image.
+RUN apt-get update && \
+    apt-get install -y python3.10 python3-pip git && \
+    rm -rf /var/lib/apt/lists/*
+
+# 4. Set the working directory.
+WORKDIR /app
+
+# 5. Copy requirements file
+COPY requirements/requirements-scheduler.txt .
+
+# 6. Install Python dependencies
+# The requirements file already includes the correct torch version and CUDA support
+RUN pip install --no-cache-dir -r requirements-scheduler.txt
+
+# 7. Copy source code
+COPY src/ src/
+
+
+#Run protos compilation script to get the latest generated protos
+
+
+# 8. Set the Python path so your modules can be imported correctly from the root.
+ENV PYTHONPATH=/app
+
+# 9. Run the scheduler
+CMD ["python3", "-u", "-m", "src.components.scheduler"]

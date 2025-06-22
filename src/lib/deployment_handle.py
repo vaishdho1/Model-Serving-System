@@ -25,7 +25,9 @@ class DeploymentHandle:
             getattr(DeploymentObj, 'replicas', []) 
         )
         self.replica_lock = asyncio.Lock()
-    
+        
+   
+
     #Made this blocking for now
     def _initialize_replicas_and_cache(self, replicas:List):
         replica_list = []
@@ -35,6 +37,12 @@ class DeploymentHandle:
                 self.replica_cache[replica.replica_id] = 0
             if replica.state == "SHUTDOWN" and replica.replica_id in self.replica_cache:
                 del self.replica_cache[replica.replica_id]
+
+        #Remove any replicas that are not in the new deployment info
+        #current_ids = [replica.replica_id for replica in replicas]
+        #for replica_id in self.replica_cache:
+        #    if replica_id not in current_ids:
+        #        del self.replica_cache[replica_id]
         return replica_list
    
     def _parse_replica_id(self, full_replica_id: str):
@@ -93,7 +101,7 @@ class DeploymentHandle:
 
         # Parse the replica ID to get the actual replica ID
         worker_id, actual_replica_id = self._parse_replica_id(full_replica_id)
-        print(f"[DeploymentHandle:{self.deployment_id}] Parsed replica_id '{full_replica_id}' -> worker_id='{worker_id}', actual_replica_id='{actual_replica_id}'")
+        #print(f"[DeploymentHandle:{self.deployment_id}] Parsed replica_id '{full_replica_id}' -> worker_id='{worker_id}', actual_replica_id='{actual_replica_id}'")
 
         try:
             # Increment request count
@@ -124,7 +132,7 @@ class DeploymentHandle:
                 # Stream tokens back as they arrive from the WorkerNode
                 async for replica_reply in stream_response:
                     if replica_reply.is_error:
-                        print(f"[DeploymentHandle:{self.deployment_id}] Error from WorkerNode for replica {actual_replica_id}: {replica_reply.output}")
+                        #print(f"[DeploymentHandle:{self.deployment_id}] Error from WorkerNode for replica {actual_replica_id}: {replica_reply.output}")
                         raise Exception(f"Error from WorkerNode for replica {actual_replica_id}: {replica_reply.output}")
                         
                     else:
@@ -151,10 +159,11 @@ class DeploymentHandle:
                         self.replica_cache[full_replica_id] = 0 
                     print(f"[DeploymentHandle:{self.deployment_id}] Decremented count for {full_replica_id} to {self.replica_cache[full_replica_id]}.")
 
+    
     async def send_request(self, message: str):
         """
         Send a streaming request to the best available replica via the WorkerNode.
-        This method returns an async generator that yields Server-Sent Events.
+        This method returns an async generator that yields Server Sent Events.
         """
         first_worker_address, second_worker_address, first_replica_id, second_replica_id = await self.pick_next_replica()
         

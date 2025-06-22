@@ -1,0 +1,31 @@
+
+# The core high-performance inference library.
+# vllm will pull in its specific required versions of 'transformers', 'accelerate', etc.
+--extra-index-url https://download.pytorch.org/whl/cu121
+
+# Now, list the PyTorch packages
+torch==2.3.0
+vllm
+accelerate
+# The web server framework for the vLLM API
+fastapi
+uvicorn[standard]
+
+grpcio==1.64.1
+protobuf==5.26.1
+grpcio-tools==1.64.1
+
+# For making outbound HTTP requests
+requests
+httpx
+
+# A common library for data manipulation
+numpy
+
+google-cloud-compute
+google-api-core
+boto3
+botocore
+
+prometheus-client
+matplotlib

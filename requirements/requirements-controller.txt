@@ -1,0 +1,17 @@
+protobuf==5.26.1
+grpcio==1.64.1
+grpcio-tools==1.64.1
+fastapi
+uvicorn
+httpx
+aiohttp
+requests
+starlette
+numpy
+torch
+transformers
+accelerate
+google-cloud-compute
+google-api-core
+boto3
+botocore

@@ -3,8 +3,8 @@
 head_store_timeout = 5
 head_store_max_retries = 3
 head_store_retry_delay = 1
-scheduler_replica_heartbeat_interval_seconds = 3
-scheduler_health_update_interval = 3
+scheduler_replica_heartbeat_interval_seconds = 5
+scheduler_health_update_interval = 5
 
 # Values for worker node
 worker_ping_timeout = 1

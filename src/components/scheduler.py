@@ -1,6 +1,6 @@
 from concurrent import futures
 import grpc
-from src.generated import headnode_service_pb2, worker_service_pb2, worker_service_pb2_grpc, headnode_service_pb2_grpc, replica_service_pb2, replica_service_pb2_grpc
+from src.generated import headnode_service_pb2, worker_service_pb2, worker_service_pb2_grpc, headnode_service_pb2_grpc, replica_service_pb2, replica_service_pb2_grpc, common_pb2
 import torch
 import multiprocessing
 import grpc
@@ -16,7 +16,6 @@ from src.lib.helpers import try_send_with_retries, try_send_with_retries_sync, s
 import signal
 import asyncio
 from google.protobuf import empty_pb2
-from src.components import add_replica
 from src.lib.utils import get_local_ip
 replica_lock = asyncio.Lock()
 '''
@@ -37,8 +36,8 @@ def _register_node(worker_id, node_address, node_port, head_address, head_port, 
         
         
         node_resource = headnode_service_pb2.Resource(
-            num_cpus=num_cpus   ,  # Default CPU allocation
-            num_gpus=num_gpus  # Default GPU allocation
+            num_cpus=int(num_cpus),  # Default CPU allocation
+            num_gpus=int(num_gpus)  # Default GPU allocation
         )
         
         request_msg = headnode_service_pb2.RegisterRequest(
@@ -67,7 +66,13 @@ def _register_node(worker_id, node_address, node_port, head_address, head_port, 
             if response and response.ack:
                 print(f"[Scheduler-{worker_id}] Node successfully registered. Ack: {response.ack}")
                 #Send backt he http port
-                
+            elif isinstance(response, Exception):
+                print(f"[Scheduler-{worker_id}] Error during registration attempt: {response}")
+                #Kill the scheduler
+                os.kill(os.getpid(), signal.SIGTERM)
+                return
+            else:
+                print(f"[Scheduler-{worker_id}] Registration failed. Ack: {response.ack}")
         except Exception as e:
             print(f"[Scheduler-{worker_id}] Error during registration attempt: {e}")
             #Kill the scheduler
@@ -85,20 +90,26 @@ class HeadNodeManager(worker_service_pb2_grpc.HeadNodeServiceServicer, worker_se
         self.node_port = node_port 
         self.head_address = head_address
         self.head_port = head_port  
-        
+        self.need_cleanup = False
        
         # Send regular health updates as a separate thread
     
     async def cleanup_replicas(self):
         global replica_registry
-        print(f"[Scheduler-{self.worker_id}] Starting replica cleanup...")
+       
         async with replica_lock:
+            if self.need_cleanup == False:
+                return
+            print(f"[Scheduler-{self.worker_id}] Starting replica cleanup...")
+            #print(f"[Scheduler-{self.worker_id}] Replica registry before cleanup: {[id for id in replica_registry]}")
             initial_count = len(replica_registry)
             replica_registry = { 
                 replica_id: rinfo for replica_id, rinfo in replica_registry.items() 
                 if rinfo.status != "DEAD" 
             }
             final_count = len(replica_registry)
+            self.need_cleanup = False
+           #print(f"[Scheduler-{self.worker_id}] Replica registry before cleanup: {[id for id in replica_registry]}")
         print(f"[Scheduler-{self.worker_id}] Replica cleanup complete. Removed {initial_count - final_count} dead replicas.")
 
     async def send_kill_signal(self):
@@ -118,7 +129,7 @@ class HeadNodeManager(worker_service_pb2_grpc.HeadNodeServiceServicer, worker_se
         '''
         #count = 0
         while True:
-            print("Sending health updates")
+            print(f"[Scheduler-{self.worker_id}] Sending health updates")
             current_replica_states = []
             # Cleanup any dead replicas
             
@@ -132,7 +143,6 @@ class HeadNodeManager(worker_service_pb2_grpc.HeadNodeServiceServicer, worker_se
                 #Added deployment_id to send to health checks
                 replica_state_pbs_list = [ 
                     headnode_service_pb2.ReplicaState(
-                        worker_id=self.worker_id,
                         replica_id=replica_id, 
                         status=values.status if hasattr(values, 'status') else "unknown", # Defensive access
                         deployment_id=values.deployment_id if hasattr(values, 'deployment_id') else "unknown"
@@ -146,12 +156,22 @@ class HeadNodeManager(worker_service_pb2_grpc.HeadNodeServiceServicer, worker_se
                     self._hcstub.SendHealthStatus, 
                     request = headnode_service_pb2.HealthStatusUpdate(
                         worker_id=self.worker_id, 
-                        state="running", 
+                        worker_address=self.node_address,
+                        port=str(self.node_port),
                         replica_states=replica_state_pbs_list
                     ),
                     num_attempts= 3, 
                     delay_seconds= 2 
             )
+            print(f"[Scheduler-{self.worker_id}] Health update output: {output}")
+            print(f"[Scheduler-{self.worker_id}] Health update output type: {type(output)}")
+            
+            # Check if output is an exception (which means the call failed)
+            if isinstance(output, Exception):
+                print(f"[Scheduler-{self.worker_id}] Health update failed with exception: {output}")
+                #print(f"[Scheduler-{self.worker_id}] Exception type: {type(output)}")
+                await self.send_kill_signal()
+                return
             
             if output is None or output.ack == 0:
                     print(f"[Scheduler-{self.worker_id}] Head node reported scheduler (node_id: {self.worker_id}) as unhealthy (ack=0). Initiating shutdown...")
@@ -159,7 +179,7 @@ class HeadNodeManager(worker_service_pb2_grpc.HeadNodeServiceServicer, worker_se
                     return # Exit thread
             # Moved this here: Update the replica registry with status here since the headNode must know about the dead replicas
             await self.cleanup_replicas()
-            print(f"[Scheduler-{self.worker_id}] Health update cycle complete. Output: {output}. Sleeping for {configurations.scheduler_health_update_interval}s.")
+            #print(f"[Scheduler-{self.worker_id}] Health update cycle complete. Output: {output}. Sleeping for {configurations.scheduler_health_update_interval}s.")
             await asyncio.sleep(configurations.scheduler_health_update_interval) 
 
     async def CreateReplica(self, request, context):
@@ -178,31 +198,30 @@ class HeadNodeManager(worker_service_pb2_grpc.HeadNodeServiceServicer, worker_se
         replica_port = 50100 + (replica_id % 1000) 
 
         cmd = [
-            "python3", "-m", "src.components.add_replica", 
+            "python3", "-m", "src.components.add_replica_vllm", 
             "--replica_id", str(replica_id), 
             "--num_cpus", str(request.num_cpus), 
             "--num_gpus", str(request.num_gpus), 
-            "--parent_port", str(self.node_port), # Port of this scheduler node
-            "--port", str(replica_port),      # Port for the new replica's server
+            "--parent_port", str(self.node_port),  # Port of this scheduler node
+            "--port", str(replica_port),           # Port for the new replica's server
             "--deployment_name", str(request.deployment_name),
-            "--deployment_id", str(request.deployment_id) # What deployment is this replica a part of
+            "--deployment_id", str(request.deployment_id)  # What deployment is this replica a part of
         ]
         #Todo: Implement cuda availability for replicas here
 
         print(f"[Scheduler-{self.worker_id}] Starting replica process for ID {replica_id} with command: {' '.join(cmd)}")
         
         try:
-            # Open a log file for the replica
+            
             log_file_name = f"replica_{replica_id}.log"
-            print(f"[Scheduler-{self.worker_id}] Redirecting output of replica {replica_id} to {log_file_name}")
+            #print(f"[Scheduler-{self.worker_id}] Redirecting output of replica {replica_id} to {log_file_name}")
             
-            # Get the project root directory (two levels up from this file)
+          
             project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-            print(f"[Scheduler-{self.worker_id}] Setting working directory to: {project_root}")
+            #print(f"[Scheduler-{self.worker_id}] Setting working directory to: {project_root}")
             
-            # Open log file and let subprocess own it (don't use context manager)
             log_file = open(log_file_name, "w")
-            # Add unbuffered output to ensure logs are written immediately
+           
             subprocess.Popen(
                 cmd, 
                 stdout=log_file, 
@@ -228,21 +247,22 @@ class HeadNodeManager(worker_service_pb2_grpc.HeadNodeServiceServicer, worker_se
     
     #Ping from the head node to the scheduler
     async def Ping(self, request, context):
-        print(f"[Scheduler-{self.worker_id}] Received ping from head node : {time.time()}")
-        return worker_service_pb2.Ack(acknowledged=True)
+        #time in hour:minute:second format
+        print(f"[Scheduler-{self.worker_id}] Received ping from head node : {time.strftime('%H:%M:%S', time.localtime())}")
+        return common_pb2.Ack(acknowledged=True)    
     
     
     async def SendRequest(self, request, context):
         worker_id = request.worker_id
         replica_id = request.replica_id
         message = request.input  # Fixed: changed from request.message to request.input
-        print(f"[Scheduler-{self.worker_id}] Received request from worker_id: {worker_id} to replica_id: {replica_id} with message: {message}")
+        #print(f"[Scheduler-{self.worker_id}] Received request from worker_id: {worker_id} to replica_id: {replica_id} with message: {message}")
         async with replica_lock:
             target_replica = replica_registry.get(replica_id)
         try:
-            # submit_task now returns a future :Todo:look at this again
+            #Todo:Currently continues the stream even if the client disconnects need to check what to do here.
             stream_queue = await target_replica.submit_task(message)
-            print(f"[Scheduler-{self.worker_id}] Task submitted to replica {replica_id}. Waiting for result...")
+            #print(f"[Scheduler-{self.worker_id}] Task submitted to replica {replica_id}. Waiting for result...")
             while True:
                 token = await stream_queue.get()
                 if token is None:
@@ -277,7 +297,7 @@ class HeadNodeManager(worker_service_pb2_grpc.HeadNodeServiceServicer, worker_se
         # Create stubs to communicate with the replica
         
         # WorkerServiceStub for task processing (PushTask)
-        worker_service_stub = replica_service_pb2_grpc.WorkerServiceStub(grpc.aio.insecure_channel(f"localhost:{request.port}"))
+        worker_service_stub = replica_service_pb2_grpc.WorkerServiceStub(grpc.aio.insecure_channel(f"0.0.0.0:{request.port}"))
         
         print(f"[WorkerManager-{self.worker_id}] Registering replica_id: {replica_id} (PID: {pid}) with port: {request.port} and state: {request.state}")
         
@@ -287,8 +307,9 @@ class HeadNodeManager(worker_service_pb2_grpc.HeadNodeServiceServicer, worker_se
             replica_registry[replica_id] = replica_handle
         
         # Returns to the create replica call which is waiting on this replica ID
-        replica_futures.set_result(replica_id, worker_service_pb2.ReplicaCreationReply(worker_id = self.worker_id, replica_id = replica_id, created = 1))
-        print(f"[WorkerManager-{self.worker_id}] Resolved CreateReplica future for replica_id: {replica_id}")
+        reply = worker_service_pb2.ReplicaCreationReply(worker_id=self.worker_id, replica_id=replica_id, created=1)
+        replica_futures.set_result(replica_id, reply)
+        #print(f"[WorkerManager-{self.worker_id}] Resolved CreateReplica future for replica_id: {replica_id}")
             
         # Acknowledgement to the replica
         return worker_service_pb2.Reply(ack=1)
@@ -301,10 +322,10 @@ class HeadNodeManager(worker_service_pb2_grpc.HeadNodeServiceServicer, worker_se
             replica_info = replica_registry.get(request.replica_id)
         #Incase the dead replicas are sending health updates, 
         if replica_info is None or replica_info.status == "DEAD": 
-            print(f"[WorkerManager-{self.worker_id}] Replica {request.replica_id} not found or dead. Sending NACK.")
+            #print(f"[WorkerManager-{self.worker_id}] Replica {request.replica_id} not found or dead. Sending NACK.")
             return worker_service_pb2.HealthReply(ack=False)
         else:
-                print(f"[WorkerManager-{self.worker_id}] Replica {request.replica_id} is healthy. Sending ACK.")
+                #print(f"[WorkerManager-{self.worker_id}] Replica {request.replica_id} is healthy. Sending ACK.")
                 return worker_service_pb2.HealthReply(ack=True)
     
     #This sends pings to all the replicas and if they do not respond, they are marked dead
@@ -316,21 +337,25 @@ class HeadNodeManager(worker_service_pb2_grpc.HeadNodeServiceServicer, worker_se
 
             dead_replica_ids = []
             for replica_id, replica_info in snapshot_for_ping:
-                
+                #Skip if the replica is already dead
+                if replica_info.status == "DEAD":
+                    continue
                 print(f"[WorkerManager-{self.worker_id}] Pinging replica_id: {replica_id} (PID: {replica_info.pid})...")
                 # Wrap the Ping call with the retry helper
                 output = await try_send_with_retries(
                             replica_info.stub.Ping, 
                             empty_pb2.Empty(),
-                            timeout=5,
-                            num_attempts=2,
-                            delay_seconds=1
+                            timeout=10,
+                            num_attempts=3,
+                            delay_seconds=2
                         )
-                if output is None:
+                #print(f"[WorkerManager-{self.worker_id}] Ping output: {output} for replica_id: {replica_id}")
+                if output is None or isinstance(output, Exception):
                     dead_replica_ids.append(replica_id)
             #Mark all dead replicas
             if dead_replica_ids:
                 async with replica_lock:
+                    self.need_cleanup = True
                     for r_id_dead in dead_replica_ids:
                         if r_id_dead in replica_registry:
                             print(f"[WorkerManager-{self.worker_id}] Updating status to 'dead' for replica_id: {r_id_dead} in registry.")
@@ -341,12 +366,12 @@ class HeadNodeManager(worker_service_pb2_grpc.HeadNodeServiceServicer, worker_se
 
 
 
-async def serve(node_port, node_id, head_address, head_port):
+async def serve(node_port, node_id, node_address, head_address, head_port):
     server = grpc.aio.server()
     
     head_node_manager_instance = HeadNodeManager(
         node_id=node_id, 
-        node_address="localhost", # Assuming scheduler runs on localhost relative to its replicas
+        node_address=node_address, # Assuming scheduler runs on localhost relative to its replicas
         node_port=node_port, 
         head_address=head_address, 
         head_port=head_port,
@@ -359,16 +384,15 @@ async def serve(node_port, node_id, head_address, head_port):
     #headnode_service_pb2_grpc.add_HeadNodeServiceServicer_to_server(head_node_manager_instance, server)
     #await asyncio.sleep(3)
     
-    server.add_insecure_port(f"[::]:{node_port}")
-    print(f"[Scheduler-{node_id}] Server listening on port {node_port}")
+    server.add_insecure_port(f"0.0.0.0:{node_port}")
+    print(f"[Scheduler-{node_id}] Server listening on 0.0.0.0:{node_port}")
     await server.start()
     
 
     # Start background tasks using the specific instances
-    #Commented out for now
-    #task1 = asyncio.create_task(worker_manager_instance.start_heartbeat_loop(), name=f"WorkerHeartbeatLoop-{node_id}")
-    #Commented out for now
-    #task1 = asyncio.create_task(head_node_manager_instance._send_health_updates(), name=f"HeadNodeHealthUpdates-{node_id}")
+    task1 = asyncio.create_task(head_node_manager_instance.start_heartbeat_loop(), name=f"WorkerHeartbeatLoop-{node_id}")
+    # Enable health updates to HeadController - this was commented out!
+    task2 = asyncio.create_task(head_node_manager_instance._send_health_updates(), name=f"HeadNodeHealthUpdates-{node_id}")
     # Keep track of tasks if more sophisticated shutdown is needed later
    
     
@@ -378,18 +402,32 @@ async def serve(node_port, node_id, head_address, head_port):
     await server.wait_for_termination()
 
 async def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--node_id", type=int, required=True)
-    parser.add_argument("--port", type=str, required=True)
-    parser.add_argument("--head_address", type=str, required=False, default="localhost")
-    parser.add_argument("--num_cpus", type=int, required=False, default=os.cpu_count())
-    parser.add_argument("--num_gpus", type=int, required=False, default=torch.cuda.device_count())
-    args = parser.parse_args()
-    node_port = 50056
+   
+    #Pick variables from the environment
+    
+    scheduler_id = os.getenv("SCHEDULER_ID", "1")  # Default to "1" if not set
+    head_port = os.getenv("HEAD_PORT")
+    head_address = os.getenv("HEAD_HOST")
+    num_cpus = os.getenv("NUM_CPUS", os.cpu_count())
+    num_gpus = os.getenv("NUM_GPUS", torch.cuda.device_count())
+    '''
+    arg_parser = argparse.ArgumentParser()
+    arg_parser.add_argument("--scheduler_id", type=int, default=1)
+    arg_parser.add_argument("--head_port", type=int, default=50051)
+    arg_parser.add_argument("--head_address", type=str, default="localhost")
+    arg_parser.add_argument("--num_cpus", type=int, default=os.cpu_count())
+    arg_parser.add_argument("--num_gpus", type=int, default=torch.cuda.device_count())
+    args = arg_parser.parse_args()
+   '''
+    
+   
     node_address = get_local_ip()
+    node_port = 50051
+    
     #First register node with the head node this is a blocking call: Commented out for now
-    _register_node(args.node_id, node_address, node_port, args.head_address, args.port, args.num_cpus, args.num_gpus)
-    await serve(node_port, args.node_id, args.head_address, args.port)
+    print(f"[Scheduler] Starting with ID: {scheduler_id}")
+    _register_node(scheduler_id, node_address, node_port, head_address, head_port, num_cpus, num_gpus)
+    await serve(node_port, int(scheduler_id), node_address, head_address, head_port)
     
 
 asyncio.run(main())

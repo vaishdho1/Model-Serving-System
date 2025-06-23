@@ -6,3 +6,4 @@ import "google/protobuf/empty.proto";
 service HealthService {
    rpc Ping(google.protobuf.Empty) returns (Ack);
 }
+  

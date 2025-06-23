@@ -9,6 +9,7 @@ import "common.proto";
 service WorkerService{
    rpc StreamGenerate (PromptRequest) returns (stream TokenChunk);
     //Ping from the workerNode
+   rpc Ping(google.protobuf.Empty) returns (Ack);
 }
 
 message PromptRequest {

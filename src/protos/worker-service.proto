@@ -9,7 +9,6 @@ service ReplicaService {
   
   rpc sendHealthupdate(HealthStatus) returns (HealthReply);
   rpc RegisterReplica(replicaStatus) returns (Reply);
-  rpc Ping(google.protobuf.Empty) returns (Ack);
 }
 
 service HeadNodeService{
@@ -17,7 +16,7 @@ service HeadNodeService{
    rpc CreateReplica(ReplicaCreationRequest) returns (ReplicaCreationReply); 
    //Headnode calls
   rpc SendRequest(ReplicaRequest) returns(stream ReplicaReply);
-
+  rpc Ping(google.protobuf.Empty) returns (Ack);
 }
 message ReplicaCreationRequest {
  

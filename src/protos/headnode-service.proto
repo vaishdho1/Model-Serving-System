@@ -45,6 +45,8 @@ message ReplicaState
 
 message HealthStatusUpdate {
   uint32 worker_id = 1; // The worker ID
+  string worker_address = 4;
+  string port = 5;
   //string state = 2; // Worker state
   repeated ReplicaState replica_states = 3;
 }

@@ -30,7 +30,7 @@ class NodeInfo:
             self.node_map[request.node_id] = Node(
                 request.node_id, f"{request.node_address}:{request.port}", channel, worker_stub, request.resource, used_resources
             )
-            print(f"[NodeInfo] Added node {request.node_id} with {request.resource.num_cpus} CPUs, {request.resource.num_gpus} GPUs. Used: {used_resources['num_cpus']} CPUs, {used_resources['num_gpus']} GPUs")
+            #print(f"[NodeInfo] Added node {request.node_id} with {request.resource.num_cpus} CPUs, {request.resource.num_gpus} GPUs. Used: {used_resources['num_cpus']} CPUs, {used_resources['num_gpus']} GPUs")
             return 
         
     async def update_resources(self, node_id, num_cpus, num_gpus, add):
@@ -41,7 +41,7 @@ class NodeInfo:
             else:
                 self.node_map[node_id].used_resources["num_cpus"] -= num_cpus
                 self.node_map[node_id].used_resources["num_gpus"] -= num_gpus
-            print(f"[NodeInfo] Updated resources for node {node_id}. Used: {self.node_map[node_id].used_resources['num_cpus']} CPUs, {self.node_map[node_id].used_resources['num_gpus']} GPUs")
+            #print(f"[NodeInfo] Updated resources for node {node_id}. Used: {self.node_map[node_id].used_resources['num_cpus']} CPUs, {self.node_map[node_id].used_resources['num_gpus']} GPUs")
             return
         
     async def remove_node(self, node_id):

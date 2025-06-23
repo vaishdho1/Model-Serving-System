@@ -4,7 +4,7 @@
 
 This project implements a **basic functional** distributed model serving system designed to manage and serve LLMs efficiently. The system consists of a head controller for coordination, scheduler nodes that manage replica processes, HTTP proxy for client access, and replica processes that run actual models. The system uses gRPC for internal communication and HTTP for client access, with robust fault tolerance, automatic restart capabilities, and support for multiple deployment scenarios.
 
-## Current Status: ***BASIC FULL FLOW UP***
+## Current Status: **Streaming response for concurrent requests up**
 The system is not fully ready but the basic functionalities are up.
 
 ## Project Structure

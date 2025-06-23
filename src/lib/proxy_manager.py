@@ -66,7 +66,7 @@ class ProxyManager():
                 print(f"[ProxyManager] Sending heartbeat")
                 
                 result = await try_send_with_retries(self.stub.Ping, empty_pb2.Empty())
-                print(f"[ProxyManager] Heartbeat result: {result}")
+                #print(f"[ProxyManager] Heartbeat result: {result}")
                 
                 
                 if isinstance(result, Exception):  
@@ -79,7 +79,7 @@ class ProxyManager():
                     continue  
                 
                
-                print(f"[ProxyManager] Heartbeat successful")
+                #print(f"[ProxyManager] Heartbeat successful")
                 await asyncio.sleep(proxy_heartbeat_interval)
                 
             except Exception as e:

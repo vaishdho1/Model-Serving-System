@@ -110,8 +110,10 @@ curl -X POST http://localhost:8000/v1/chat/tinyllama \
 
 ### Planned Features
 
-- **Auto-scaling**: Dynamic replica scaling based on request queues on the vllm side
-- **Persistent-Storage** - Adding persistent storage for head-controller to deal with fault tolerance
-- **Smarter LoadBalancing** - Adding better load balancing techniques
+- **Autoscaling**: Dynamic replica scaling based on request queues on the vllm side taking SLO requriements into consideration.
+- **Persistent Storage**:  Exploring storage options for head controller to deal with fault tolerance.
+- **Distributed proxy**: Add distributed proxy features for better handling of requests
 
-*(Note: Docker images are configured for production deployment but may require environment-specific configuration)*
+
+
+*(Note: Docker images may require environment specific configuration)*

@@ -68,7 +68,6 @@ class HttpProxy():
         async with self.routing_lock:
             self.routing_table = {}
         # Add new or update existing deployments
-
             for deployment_id, dep_info_proto in update.current_deployments.items():
                 self.routing_table[dep_info_proto.deployment_name] = DeploymentHandle(deployment_id, dep_info_proto)
             print(f"[HttpProxy:{self.proxy_id}] Routing table updated. Current deployments: {list(self.routing_table.keys())}")
@@ -78,7 +77,7 @@ class HttpProxy():
         """Subscribes to routing updates from the HeadController."""
         while True:
             try:
-                async with grpc.aio.insecure_channel(f"localhost:{self.parent_port}") as channel:
+                async with grpc.aio.insecure_channel(f"0.0.0.0:{self.parent_port}") as channel:
                     stub = headnode_service_pb2_grpc.ProxyManagementServiceStub(channel)
                     print(f"[HttpProxy] Subscribing to head node at {self.parent_port}")
                     request = headnode_service_pb2.SubscriptionRequest(proxy_id=self.proxy_id)
@@ -118,11 +117,11 @@ class HttpProxy():
                 async with self.routing_lock:
                     deployment_handle = self.routing_table.get(deployment_name)
                     if not deployment_handle:
-                        print(f"[HttpProxy:{self.proxy_id}] Deployment '{deployment_name}' not found in routing table.")
+                        #print(f"[HttpProxy:{self.proxy_id}] Deployment '{deployment_name}' not found in routing table.")
                         yield f"data: {{'error': 'Deployment {deployment_name} not found', 'is_complete': true}}\n\n"
                         return
                 
-                # Now we can properly stream token by token
+                
                 async for token_data in deployment_handle.send_request(message):
                     #print(f"[HttpProxy:{self.proxy_id}] Yielding token data: {token_data[:100]}...")
                     yield token_data
@@ -135,7 +134,7 @@ class HttpProxy():
             headers={
                 "Cache-Control": "no-cache",
                 "Connection": "keep-alive",
-                "X-Accel-Buffering": "no"  # Disable nginx buffering
+                "X-Accel-Buffering": "no"  
             }
         )
 
@@ -145,12 +144,12 @@ class HttpProxy():
 async def handle_process_string_request(request: Request):
     """
     Receives an HTTP POST request, treats its body as a string,
-    sends it to the backend (simulated gRPC), and returns the response.
+    sends it to the backend, and returns the response.
     """
     client_host = request.client.host if request.client else "unknown_client"
     request_id = str(uuid.uuid4()) # Unique ID for this request handling instance
     path = request.url.path
-    print(f"HTTP_HANDLER [{request_id}]: Received POST from {client_host} to {request.url.path}")
+    #print(f"HTTP_HANDLER [{request_id}]: Received POST from {client_host} to {request.url.path}")
 
     http_body_bytes = await request.body()
 

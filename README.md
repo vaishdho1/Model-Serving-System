@@ -1,13 +1,13 @@
-# Distributed Model Serving System
+# Model Serving System
 
 ## Overview
 
-A  distributed model serving system designed for high performance LLM inference with real time streaming responses. The system features a distributed architecture with comprehensive monitoring, and fault tolerance, successfully deployed on AWS with Docker containers.
+This project implements a **distributed model serving system** designed to efficiently manage and serve Large Language Models (LLMs). The architecture features a **head controller** for coordination, **scheduler nodes** managing replica processes, an **HTTP proxy** for client access, and **replica processes** running the actual models. Built with **gRPC** for internal communication and **HTTP** for client interfaces, the system delivers robust fault tolerance, automatic restart capabilities, and flexible deployment options while successfully handling **1000+ concurrent users** with **100+ RPS sustained throughput**.
 
 
 ### Core Components
 
-- **HTTP Proxy** (`src/components/headNode/http_proxy.py`): 
+- **HTTP Proxy** (`src/components/headNode/http_proxy.py`): FastAPI-based client interface providing RESTful endpoints 
 - **Head Controller** (`src/components/headNode/head_controller.py`): Central orchestrator for the system
 - **Scheduler Nodes** (`src/components/scheduler.py`): Worker nodes managing model replicas
 - **Model Replicas** (`src/components/add_replica_vllm.py`): vLLM powered inference engines
@@ -19,7 +19,7 @@ A  distributed model serving system designed for high performance LLM inference 
 
 ### **High-Performance Inference**
 - **vLLM AsyncEngine**: Continuous batching with PagedAttention for optimal GPU utilization
-- **Token-by-Token Streaming**: Real time response streaming with sub-100ms first token latency
+- **Token-by-Token Streaming**: Real time response streaming
 - **Concurrent Processing**: Handles 1000+ concurrent requests with minimal latency increase
 - **Efficient Memory Management**: 2-3x better GPU memory utilization vs vanilla Transformers
 
@@ -84,7 +84,7 @@ cd scripts/aws_scripts
 ./deploy-controller-aws.sh
 ```
 
-## (Optionally) Start Prometheus VM
+#### (Optionally) Start Prometheus VM
 ```bash
 ./deploy_prometheus_vm_aws.sh
 ```
@@ -155,10 +155,10 @@ RELIABILITY TESTING:
 
 ## **Planned features**
 
-- [] **Autoscaling**: Dynamic replica scaling based taking SLO requirements into consideration.
-- [] **Persistent Storage**: Exploring storage options for head controller to deal with fault tolerance.
-- [] **Distributed proxy**: Add distributed proxy features for better handling of requests
-- [] **Quantized inference** : Add 4-bit, 8-bit inference support
+[] **Autoscaling**: Dynamic replica scaling taking SLOs into consideration.
+[] **Persistent Storage**: Exploring storage options for head controller to deal with fault tolerance.
+[] **Distributed proxy**: Add distributed proxy features for better handling of requests
+[] **Quantized inference** : Add 4-bit, 8-bit inference support
 
 
 

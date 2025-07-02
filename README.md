@@ -155,10 +155,10 @@ RELIABILITY TESTING:
 
 ## **Planned features**
 
-[] **Autoscaling**: Dynamic replica scaling taking SLOs into consideration.
-[] **Persistent Storage**: Exploring storage options for head controller to deal with fault tolerance.
-[] **Distributed proxy**: Add distributed proxy features for better handling of requests
-[] **Quantized inference** : Add 4-bit, 8-bit inference support
+-[] **Autoscaling**: Dynamic replica scaling taking SLOs into consideration.
+-[] **Persistent Storage**: Exploring storage options for head controller to deal with fault tolerance.
+-[] **Distributed proxy**: Add distributed proxy features for better handling of requests
+-[] **Quantized inference** : Add 4-bit, 8-bit inference support
 
 
 

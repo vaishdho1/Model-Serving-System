@@ -12,87 +12,54 @@ class Replica:
         self.worker_id = worker_id
         self.stub = stub # This is a synchronous stub
         self.headnode_stub = headnode_stub
-        self.replica_queue = asyncio.Queue()
         self.status = "idle"  # "idle" or "processing"
-        self._processing_task = None  # asyncio.Task for the _process_queue consumer
         self.deployment_id = deployment_id
-    
-    async def _try_send_with_retries(self, coroutine_function, request_message, max_attempts=3, delay_ms=100):
-        """
-        Tries to send a message with retries.
-        """
-        for attempt in range(max_attempts): 
-            try:
-                print(f"[Replica-{self.pid}] Attempt {attempt + 1} calling RPC. Request: {request_message}")
-                return await coroutine_function (request_message)
-            except grpc.aio.AioRpcError as e:
-                if e.code() == grpc.StatusCode.UNAVAILABLE:
-                    print(f"[Replica-{self.pid}] Attempt {attempt + 1} failed during send, retrying...")
-                    await asyncio.sleep(delay_ms / 1000.0)
-                else:
-                    print(f"[Replica-{self.pid}] Unknown gRPC error during send: {e.code()} - {e.details()}")
-                    raise  # Re-raise to be caught by the caller (_process_queue)
-        print(f"[Replica-{self.pid}] Max send attempts reached for RPC.")
-        raise Exception("Max send attempts reached")
-   
-   
+        self.active_requests = 0
+        #self.max_concurrent_requests = 128  # Limit concurrent requests per replica
+       
+
     async def submit_task(self, input_data):
         """
-        Submits a task to this replica's queue.
-        Returns a future that will be resolved with the task's output string or an exception.
+        Submits a task by immediately creating a concurrent worker for it.
+        Returns the queue that the worker will use to stream results.
         """
         stream_queue = asyncio.Queue()
-        print(f"[Replica-{self.pid}] Waiting to submit task to queue. Queue size: {self.replica_queue.qsize()}")
-        await self.replica_queue.put((input_data, stream_queue))
-        print(f"[Replica-{self.pid}] Submitted task to queue. Queue size: {self.replica_queue.qsize()}")
-
-        if self.status == "idle" or self._processing_task is None:
-            print(f"[Replica-{self.pid}] Starting/restarting task processing loop.")
-            self.status = "processing"
-            self._processing_task = asyncio.create_task(self._process_queue())
+        print(f"[Replica-{self.pid}] Immediately creating a processing task for new request.")
+        
+        # For every new task, create a new, independent processing coroutine.
+        asyncio.create_task(self._process_individual_task(input_data, stream_queue))
        
         return stream_queue
 
-    async def _process_queue(self):
+    # REMOVED: _send_batched_requests method - no longer needed
+
+    async def _process_individual_task(self, input_data, stream_queue):
         """
-        A long-running task that consumes from self.replica_queue and processes tasks.
+        This coroutine handles exactly one request and then exits.
+        Multiple instances of this will run concurrently.
         """
-        print(f"[Replica-{self.pid}] Task processing consumer started.")
-        
-        while True:
-            input_data, stream_queue = None, None
-            try:
-                print(f"[Replica-{self.pid}] Waiting for task from queue (size: {self.replica_queue.qsize()}). Status: {self.status}")
-                input_data, stream_queue = await self.replica_queue.get()
+        print(f"[Replica-{self.pid}] Starting gRPC stream for a single task.")
+        try:
+            self.status = "processing"
+            task_request = replica_service_pb2.PromptRequest(prompt=input_data)
+
+            # Make the gRPC call. This will run concurrently with other calls.
+            async for chunk in self.stub.StreamGenerate(task_request):
                 
-                self.status = "processing"
+                await stream_queue.put(replica_service_pb2.TokenChunk(text=chunk.text, is_error=False)) # Forward the chunk directly
 
-                print(f"[Replica-{self.pid}] Got task from queue. Processing...")
+            # Signal the end of the stream to the consumer.
+            await stream_queue.put(None)
 
-                task_request = replica_service_pb2.PromptRequest(prompt=input_data)
+        except grpc.aio.AioRpcError as e:
+            print(f"[Replica-{self.pid}] gRPC Error during stream: {e.code()} - {e.details()}")
+            await stream_queue.put(replica_service_pb2.TokenChunk(text=f"gRPC stream failed: {e.details()}", is_error=True))
+        except Exception as e:
+            print(f"[Replica-{self.pid}] Exception in task processing: {e}")
+            await stream_queue.put(replica_service_pb2.TokenChunk(text=f"Generic error in stream: {e}", is_error=True))
 
-               
-                async for chunk in self.stub.StreamGenerate(task_request):
-                    await stream_queue.put(replica_service_pb2.TokenChunk(text=chunk.text, is_error=False))
-                    print(f"[Replica-{self.pid}] Sent chunk to stream_queue: {chunk.text}")
-                await stream_queue.put(None)
-
-            except asyncio.CancelledError:
-                print(f"[Replica-{self.pid}] Task processing consumer loop was cancelled.")
-                await stream_queue.put(replica_service_pb2.TokenChunk(text="gRPC stream failed", is_error=True))
-                self.status = "idle"
-                self._processing_task = None
-                raise
-
-            except Exception as e:
-                print(f"[Replica-{self.pid}] Exception: {e}")
-                await stream_queue.put(replica_service_pb2.TokenChunk(text=f"gRPC stream failed: {e}", is_error=True))
-
-            finally:
-                if self.replica_queue.qsize() == 0 and self.status == "processing":
-                    print(f"[Replica-{self.pid}] Queue is empty after processing. Setting status to idle.")
-                    self.status = "idle"
-
+    
+   
                     
         
         

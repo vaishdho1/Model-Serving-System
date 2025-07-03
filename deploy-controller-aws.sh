@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# --- Configuration: UPDATE THESE VARIABLES ---
+# --- Configuration ---
 export AWS_REGION="us-east-1"
 export INSTANCE_TYPE="t3.xlarge"
 export KEY_NAME="my-gpu-vm"
@@ -35,7 +35,7 @@ aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --
 docker pull $IMAGE_URI
 docker run -d -p 8000:8000 -p 50056:50056 -p 50053:50053 $IMAGE_URI --http_port=8000 --node_port=50056 --grpc_port=50053
 EOF
-) # <-- FIX 1: Closing parenthesis on its own line
+) 
 
 # --- Launch EC2 Instance ---
 echo "Step 2: Launching EC2 instance..."

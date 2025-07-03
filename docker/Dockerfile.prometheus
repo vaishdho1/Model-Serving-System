@@ -1,0 +1,5 @@
+# Start from the official Prometheus image
+FROM prom/prometheus:latest
+
+
+COPY infra/prometheus.yml /etc/prometheus/prometheus.yml

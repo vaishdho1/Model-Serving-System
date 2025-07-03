@@ -1,0 +1,27 @@
+version: '3.7'
+
+volumes:
+  prometheus_data: {}
+  grafana_data: {}
+
+services:
+  prometheus:
+    # This uses your custom image from ECR
+    image: 768245436582.dkr.ecr.us-east-1.amazonaws.com/monitoring-prometheus:v1 # <--- REPLACE with your full image URI
+    container_name: prometheus
+    volumes:
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    restart: always
+
+  grafana:
+    image: grafana/grafana-oss:latest
+    container_name: grafana
+    volumes:
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    restart: always
+    depends_on:
+      - prometheus

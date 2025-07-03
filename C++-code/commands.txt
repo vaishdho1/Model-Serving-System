@@ -1,9 +1,0 @@
- 
- 
- g++ -std=c++17 -I. -I/opt/homebrew/include \
-  dummy_comm.cc \
-  worker-service.pb.cc worker-service.grpc.pb.cc \
-  headnode-service.pb.cc headnode-service.grpc.pb.cc \
-  -L/opt/homebrew/lib \
-  $(pkg-config --libs grpc++ protobuf) \
-  -o app -pthread

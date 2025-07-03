@@ -15,3 +15,5 @@ google-cloud-compute
 google-api-core
 boto3
 botocore
+prometheus-client
+aioprometheus

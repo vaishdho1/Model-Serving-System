@@ -29,3 +29,4 @@ botocore
 
 prometheus-client
 matplotlib
+aioprometheus

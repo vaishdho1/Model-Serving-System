@@ -11,7 +11,7 @@ export IMAGE_URI="768245436582.dkr.ecr.us-east-1.amazonaws.com/model-serving-con
 export IAM_ROLE_NAME="EC2ModelServingRole"
 
 # --- Find Security Group ID by Name ---
-echo "✅ Step 1: Finding Security Group ID for '$SECURITY_GROUP_NAME'..."
+echo "Step 1: Finding Security Group ID for '$SECURITY_GROUP_NAME'..."
 SECURITY_GROUP_ID=$(aws ec2 describe-security-groups \
   --filters "Name=tag:Name,Values=$SECURITY_GROUP_NAME" \
   --query 'SecurityGroups[0].GroupId' \

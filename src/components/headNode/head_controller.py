@@ -237,7 +237,7 @@ class HeadController(
     
     async def _create_vm_in_thread(self):
         """Run VM creation in a separate thread using asyncio.to_thread."""
-        for i in range(2):
+        for i in range(4):
             try:
                 print(f"[HeadController] Creating VM {i+1}")
                 await asyncio.to_thread(

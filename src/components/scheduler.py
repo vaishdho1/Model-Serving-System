@@ -272,6 +272,7 @@ class HeadNodeManager(worker_service_pb2_grpc.HeadNodeServiceServicer, worker_se
                     #yield headnode_service_pb2.ReplicaReply(output= token.text, is_error=token.is_error)
                     yield worker_service_pb2.ReplicaReply(output= "Error", is_error=True)
                     return
+                #print(f"[Scheduler-{self.worker_id}] Sending token: '{token.text}'")
                 yield worker_service_pb2.ReplicaReply(output= token.text, is_error=token.is_error)
             
         except Exception as e:

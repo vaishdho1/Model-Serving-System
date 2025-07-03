@@ -89,12 +89,8 @@ class DeploymentHandle:
                                                         message: str):
         """
         Send a streaming request to the WorkerNode which will forward it to the specified replica.
-        
-        Args:
-            full_replica_id: Format 'worker_id#actual_replica_id'
-            worker_node_address: Address of the WorkerNode
-            message: The message to send to the replica
         """
+       
         if not full_replica_id or not worker_node_address:
             print(f"[DeploymentHandle:{self.deployment_id}] Invalid replica_id or worker_node_address provided for streaming attempt.")
             return
@@ -174,6 +170,7 @@ class DeploymentHandle:
             print(f"[DeploymentHandle:{self.deployment_id}] Attempt 1: Targeting replica {first_replica_id} via WorkerNode at {first_worker_address}.")
             try:
                 async for token_data in self._attempt_streaming_request_to_worker_node(first_replica_id, first_worker_address, message):
+                    #print(f"[DeploymentHandle:{self.deployment_id}] Sending token: '{token_data}'")
                     yield token_data
                 return  # Successfully streamed, return
             except Exception as e:

@@ -1,6 +1,6 @@
 import sys
 import os
-
+import time
 
 import argparse
 import asyncio
@@ -26,6 +26,22 @@ from src.lib.model_config import model_config_manager
 import json # Added back
 import base64 # Added back
 
+# Prometheus metrics
+
+from aioprometheus import Counter, Histogram, render, REGISTRY
+
+PROXY_REQUEST_LATENCY = Histogram(
+    "proxy_request_latency_seconds",
+    "End-to-end request latency from proxy perspective",
+)
+PROXY_FIRST_TOKEN_LATENCY = Histogram(
+    "proxy_first_token_latency_seconds",
+    "Time to first token from proxy perspective",
+)
+PROXY_REQUEST_COUNT = Counter(
+    "proxy_requests_total",
+    "Total requests handled by proxy",
+)
 # --- FastAPI App Definition ---
 app = FastAPI()
 
@@ -47,7 +63,8 @@ class HttpProxy():
         self.http_client = httpx.AsyncClient() 
         # Start subscription to head node
         self.subscription_task = asyncio.create_task(self.subscribe_to_head_node())
-        print(f"[HttpProxy:{self.proxy_id}] Initialized. Listening for HeadController on port {parent_port}.")
+       
+           
     
     
     async def close(self):
@@ -110,23 +127,47 @@ class HttpProxy():
         
         print(f"[HttpProxy] Forwarding streaming request to deployment '{deployment_name}'")
         
+        # Metrics tracking variables
+        
+       
         async def stream_generator():
             """Generator that yields streaming tokens from the replica"""
+            start_time = time.time()
+            first_token_received = False
             try:
                 # Handle routing lock properly inside the async generator
                 async with self.routing_lock:
                     deployment_handle = self.routing_table.get(deployment_name)
                     if not deployment_handle:
                         #print(f"[HttpProxy:{self.proxy_id}] Deployment '{deployment_name}' not found in routing table.")
+                       
                         yield f"data: {{'error': 'Deployment {deployment_name} not found', 'is_complete': true}}\n\n"
                         return
                 
                 
                 async for token_data in deployment_handle.send_request(message):
-                    #print(f"[HttpProxy:{self.proxy_id}] Yielding token data: {token_data[:100]}...")
+                    # Record first token timing
+                    if not first_token_received:
+                        first_token_received = True
+                        ttft = time.time() - start_time
                     yield token_data
+                
+                # Record successful completion
+                total_time = time.time() - start_time
+                success_labels = {"deployment_name": deployment_name, "status": "success"}
+                if first_token_received:
+                   PROXY_FIRST_TOKEN_LATENCY.observe({"deployment_name": deployment_name}, ttft)
+                PROXY_REQUEST_LATENCY.observe(success_labels, total_time)
+                PROXY_REQUEST_COUNT.inc(success_labels)
+
             except Exception as e:
-               yield "Error in streaming, retry"
+                print(f"Error in stream_generator for {deployment_name}: {e}")
+                total_time = time.time() - start_time
+                error_labels = {"deployment_name": deployment_name, "status": "error"}
+                PROXY_REQUEST_LATENCY.observe(error_labels, total_time)
+                PROXY_REQUEST_COUNT.inc(error_labels)
+                
+                yield "Error in streaming, retry"
         
         return StreamingResponse(
             stream_generator(), 
@@ -138,8 +179,18 @@ class HttpProxy():
             }
         )
 
+@app.get("/metrics")
+async def metrics(request: Request):
+    """
+    Prometheus metrics endpoint.
+    Uses aioprometheus render() to expose all collected metrics.
+    """
+    accept_header = request.headers.get("accept", "")
+    content, http_headers = render(REGISTRY, [accept_header])
+    return Response(content, media_type=http_headers["Content-Type"])
 
   
+
 @app.post("/{path:path}")
 async def handle_process_string_request(request: Request):
     """
@@ -227,7 +278,7 @@ def main():
     parser.add_argument("--http_port", type=int, default=8000, help="Port for this proxy's HTTP server.")
     parser.add_argument("--grpc_port", type=int, default=50052, help="Port for this proxy's gRPC server")
     args = parser.parse_args()
-
+    # Metrics will be served via FastAPI /metrics endpoint
     # HttpProxy instance will be created in run_proxy_server
     
     try:

@@ -1,5 +1,6 @@
 # Start a replica server given the port and send ready reques
 from concurrent import futures
+from gc import disable
 import grpc
 from src.generated import worker_service_pb2, worker_service_pb2_grpc, replica_service_pb2_grpc, replica_service_pb2, common_pb2
 import grpc
@@ -13,14 +14,35 @@ import torch
 from vllm import AsyncLLMEngine, SamplingParams
 from vllm.engine.arg_utils import AsyncEngineArgs
 from vllm.utils import random_uuid
-from prometheus_client import start_http_server, REGISTRY
+from prometheus_client import start_http_server, Histogram, Counter, REGISTRY
 import requests
 from vllm.engine.metrics import Metrics
 '''
 The server is synchronous. It is stateless just does inference depending on the input that it gets.
 Todo: Add VLLM support for efficient inference
 '''
+#This stores the latency and requests count for the vllm requests.
+REQUEST_LATENCY = Histogram(
+            'replica_request_latency_seconds',
+            'Replica request latency in seconds',
+            ['deployment_name', 'replica_id'],
+            registry=REGISTRY  # Use the same registry as vLLM
+        )
 
+REQUEST_COUNT = Counter(
+            'replica_requests_total',
+            'Total replica requests handled',
+            ['deployment_name', 'replica_id', 'status'],
+            registry=REGISTRY  # Use the same registry as vLLM
+        )
+
+FIRST_TOKEN_LATENCY = Histogram(
+            'replica_first_token_latency_seconds',
+            'Replica first token latency in seconds',
+            ['deployment_name', 'replica_id'],
+            registry=REGISTRY  # Use the same registry as vLLM
+        )
+       
 class ReplicaManager(replica_service_pb2_grpc.WorkerServiceServicer):
     def __init__(self, parent_port, replica_id, port, deployment_name, deployment_id, num_cpus=1, num_gpus=0):
         self.parent_port = parent_port
@@ -63,15 +85,14 @@ class ReplicaManager(replica_service_pb2_grpc.WorkerServiceServicer):
     
             engine_args = AsyncEngineArgs(
                 model=self.model_id,
-                max_num_batched_tokens=16536,  
-                max_num_seqs=256,             
+                max_num_batched_tokens=65536,  
+                max_num_seqs=512,             
                 max_model_len=2048,          
                 dtype="float16",             
                 trust_remote_code=True,
-                device="cuda",              
-                enforce_eager=True,          
-                gpu_memory_utilization=0.85,  
-                
+                device="cuda",               
+                gpu_memory_utilization=0.85, 
+                  
             )
             self.engine = AsyncLLMEngine.from_engine_args(engine_args)
             print(f"[ReplicaManager-{self.replica_id}] vLLM Engine initialized")
@@ -110,9 +131,10 @@ class ReplicaManager(replica_service_pb2_grpc.WorkerServiceServicer):
             include_stop_str_in_output=False
             )
         
-        # Track what we've already sent to avoid duplication
-        sent_text = ""
-        
+        # Optimized streaming with position tracking
+        sent_position = 0
+        start_time = time.time()
+        first_token_received = False
         try:
             # Add request and get async generator for real streaming
             results_generator = self.engine.generate(formatted_prompt, sampling_params, request_id)
@@ -120,26 +142,49 @@ class ReplicaManager(replica_service_pb2_grpc.WorkerServiceServicer):
             async for request_output in results_generator:
                 
                 # Stream only the new tokens, not the entire accumulated text
-                
                 for output in request_output.outputs:
                     current_text = output.text
+                    current_length = len(current_text)
                     
-                    # Only send the new part that hasn't been sent yet
-                    if len(current_text) > len(sent_text):
-                        new_text = current_text[len(sent_text):]
-                        if new_text:  # Only send if there's actually new text
+                    # Only process new content
+                    if current_length > sent_position:
+                        if not first_token_received:
+                            ttft = time.time() - start_time
+                            first_token_received = True
+                            FIRST_TOKEN_LATENCY.labels(deployment_name=self.deployment_name, replica_id=str(self.replica_id)).observe(ttft)
+                           
+                        # Extract only the new portion
+                        new_text = current_text[sent_position:]
+                        if new_text:
+                            #print(f"[ReplicaManager-{self.replica_id}] Sending token: '{new_text}'")
                             yield replica_service_pb2.TokenChunk(text=new_text, is_error=False)
-                            sent_text = current_text  # Update what we've sent
+                            sent_position = current_length
                 
                 # If finished, break out of the loop
                 if request_output.finished:
                     break
-                    
+            
+                REQUEST_COUNT.labels(
+                    deployment_name=self.deployment_name,
+                    replica_id=str(self.replica_id),
+                    status="success"
+                ).inc()
         except Exception as e:
             print(f"[ReplicaManager-{self.replica_id}] vLLM Error: {str(e)}")
             yield replica_service_pb2.TokenChunk(text=f"[vLLM Error] {str(e)}", is_error=True)
+            REQUEST_COUNT.labels(
+                    deployment_name=self.deployment_name,
+                    replica_id=str(self.replica_id),
+                    status="error"
+                ).inc()
             
-       
+        finally:
+            duration = time.time() - start_time
+            REQUEST_LATENCY.labels(
+                    deployment_name=self.deployment_name,
+                    replica_id=str(self.replica_id)
+                ).observe(duration)
+
     
     async def poll_metrics_periodically(self):
     
@@ -150,30 +195,34 @@ class ReplicaManager(replica_service_pb2_grpc.WorkerServiceServicer):
                 if response.status_code == 200:
                     print("--- METRICS SNAPSHOT ---")
                     for line in response.text.splitlines():
-                        if any(keyword in line for keyword in ["vllm"]) and not line.startswith("#"):
+                        # Look for both vLLM and our custom replica metrics
+                        if any(keyword in line for keyword in ["vllm", "replica_request", "replica_first_token"]) and not line.startswith("#"):
                             print(line)
             except Exception as e:
                 print(f"Could not fetch metrics: {e}")
             await asyncio.sleep(2)
-        
+           
    
-    def send_with_retries(self, coro_func, *args, num_attempts=3, delay_seconds=2, **kwargs):
-        #This should try registering and if not succesful after num_attemps, it should kill itself
+    async def send_with_retries_async(self, coro_func, *args, num_attempts=3, delay_seconds=2, **kwargs):
+        #This should try registering and if not successful after num_attempts, it should kill itself
         for attempt in range(1, num_attempts + 1):
             try:
-                return coro_func(*args, **kwargs)
+                return await coro_func(*args, **kwargs)
             except grpc.RpcError as e:
-                print(f"gRPC error on attempt {attempt}/3 sending health update: code={e.code()}, details='{e.details()}'")
+                print(f"gRPC error on attempt {attempt}/{num_attempts} sending registration: code={e.code()}, details='{e.details()}'")
+                if attempt < num_attempts:
+                    print(f"Retrying registration in {delay_seconds} seconds...")
+                    await asyncio.sleep(delay_seconds)
         
-        print("Failed to send health update after 3 attempts. Terminating process.")
+        print("Failed to register replica after 3 attempts. Terminating process.")
         os.kill(self.pid, signal.SIGTERM)
-        return
+        return None
 
-    def register_replica(self):
+    async def register_replica(self):
         print(f"[ReplicaManager-{self.replica_id}] Registering replica")
         
-        # Try to register, but only retry on failure
-        response = self.send_with_retries(
+        # Try to register with async retries
+        response = await self.send_with_retries_async(
             self.stub.RegisterReplica,
             worker_service_pb2.replicaStatus(
                 replica_id = self.replica_id,
@@ -271,12 +320,13 @@ async def main():
 
     print(f"Replica {args.replica_id} listening on port {args.port}")
     
-    #Temporary sleep to allow server
+    # Wait for server to be fully ready before registering
+    await asyncio.sleep(2)  # Non-blocking async sleep
     
-
-    # Blocking call 
-    time.sleep(5)
-    replica_manager.register_replica()
+    # Register replica asynchronously
+    await replica_manager.register_replica()
+    
+    print(f"[Replica-{args.replica_id}] Registration complete, server ready for requests")
     await server.wait_for_termination()
     
     

@@ -5,12 +5,15 @@ import grpc
 from dataclasses import dataclass
 from src.generated import worker_service_pb2, worker_service_pb2_grpc, replica_service_pb2, replica_service_pb2_grpc
 from src.lib.helpers import try_send_with_retries, send_with_delay
+
+
+import time
 #This takes an input from the proxy and stores it
 
 @dataclass
 class ReplicaInfo:
     replica_id : str  # Format: worker_id#actual_replica_id
-    replica_address : str  # WorkerNode address
+    replica_address : str  # Replica address
     state : str
 
 
@@ -57,42 +60,26 @@ class DeploymentHandle:
     
     async def pick_next_replica(self):
         #Picks the least loaded replica and the second least loaded replica for routing
-        firstMin, secondMin = float('inf'), float('inf')
-        firstAddress, secondAddress = "", ""
-        firstReplicaId, secondReplicaId = "", ""
+        async with self.replica_lock:
+            running_replicas = [r for r in self.replicas if r.state == "RUNNING"]
+            selected_replica = min(running_replicas, key=lambda r: self.replica_cache.get(r.replica_id, 0))
+            current_count = self.replica_cache.get(selected_replica.replica_id, 0)
+            self.replica_cache[selected_replica.replica_id] = current_count + 1
+            print(f"[DeploymentHandle] Picked {selected_replica.replica_id}, new count: {self.replica_cache[selected_replica.replica_id]}")
+            return selected_replica.replica_address, selected_replica.replica_id
+
         
-        async with self.replica_lock: # Acquire the lock once
-            for replica in self.replicas: # self.replicas should be List[ReplicaInfo]
-                if replica.state == "RUNNING":
-                    if replica.replica_id in self.replica_cache:
-                        count = self.replica_cache[replica.replica_id]
-                        
-                        if count < firstMin:
-                            secondMin = firstMin
-                            secondAddress = firstAddress
-                            secondReplicaId = firstReplicaId
-                            firstMin = count
-                            firstAddress = replica.replica_address 
-                            firstReplicaId = replica.replica_id   
-                        elif count < secondMin: 
-                            secondMin = count
-                            secondAddress = replica.replica_address 
-                            secondReplicaId = replica.replica_id   
-                    else:
-                        print(f"[DeploymentHandle:{self.deployment_id}] Warning: Replica {replica.replica_id} is RUNNING but not in replica_cache during pick_next_replica. Skipping.")
-            
-        return firstAddress, secondAddress, firstReplicaId, secondReplicaId
             
     async def _attempt_streaming_request_to_worker_node(self, 
                                                         full_replica_id: str,
-                                                        worker_node_address: str,
+                                                        replica_address: str,
                                                         message: str):
         """
         Send a streaming request to the WorkerNode which will forward it to the specified replica.
         """
        
-        if not full_replica_id or not worker_node_address:
-            print(f"[DeploymentHandle:{self.deployment_id}] Invalid replica_id or worker_node_address provided for streaming attempt.")
+        if not full_replica_id or not replica_address:
+            print(f"[DeploymentHandle:{self.deployment_id}] Invalid replica_id or replica_address provided for streaming attempt.")
             return
 
         # Parse the replica ID to get the actual replica ID
@@ -105,21 +92,17 @@ class DeploymentHandle:
                 if full_replica_id not in self.replica_cache:
                     print(f"[DeploymentHandle:{self.deployment_id}] Warning: Replica {full_replica_id} not in cache for count increment. Aborting attempt.")
                     return 
-                self.replica_cache[full_replica_id] += 1
-                print(f"[DeploymentHandle:{self.deployment_id}] Incremented count for {full_replica_id} to {self.replica_cache[full_replica_id]}.")
-
+                
             # Connect to WorkerNode and submit streaming task
-            async with grpc.aio.insecure_channel(worker_node_address) as channel:
-                # Use HeadNodeService stub to call the WorkerNode
-                stub = worker_service_pb2_grpc.HeadNodeServiceStub(channel)
+            async with grpc.aio.insecure_channel(replica_address) as channel:
+                # New Design:Use directly the replica service stub 
+                stub = replica_service_pb2_grpc.WorkerServiceStub(channel)
                 
-                print(f"[DeploymentHandle:{self.deployment_id}] Sending streaming request to WorkerNode at {worker_node_address} for replica {actual_replica_id}...")
+                print(f"[DeploymentHandle:{self.deployment_id}] Sending streaming request to Replica at {replica_address} for replica {actual_replica_id}...")
                 
-                # Create ReplicaRequest for the WorkerNode
-                request = worker_service_pb2.ReplicaRequest(
-                    worker_id=int(worker_id),  # Use the parsed worker_id
-                    replica_id=int(actual_replica_id),  # Use the actual replica_id (without worker_id prefix)
-                    input=message
+                # Create ReplicaRequest for the Replica
+                request = replica_service_pb2.ReplicaRequest(
+                    prompt=message
                 )
                 
                 # Call SendRequest method on WorkerNode (returns a stream)
@@ -129,11 +112,11 @@ class DeploymentHandle:
                 async for replica_reply in stream_response:
                     if replica_reply.is_error:
                         #print(f"[DeploymentHandle:{self.deployment_id}] Error from WorkerNode for replica {actual_replica_id}: {replica_reply.output}")
-                        raise Exception(f"Error from WorkerNode for replica {actual_replica_id}: {replica_reply.output}")
+                        raise Exception(f"Error Replica {actual_replica_id}: from worker {worker_id}: {replica_reply.text}")
                         
                     else:
                         # Stream the token back to HTTP proxy
-                        token_text = replica_reply.output
+                        token_text = replica_reply.text
                     
                        
                         yield token_text
@@ -143,9 +126,9 @@ class DeploymentHandle:
                 print(f"[DeploymentHandle:{self.deployment_id}] Streaming completed for replica {actual_replica_id}")
 
         except grpc.aio.AioRpcError as e:
-            raise Exception(f"gRPC error with WorkerNode at {worker_node_address} for replica {actual_replica_id}: {e.code()} - {e.details()}")
+            raise Exception(f"gRPC error with Replica at {replica_address} for replica {actual_replica_id}: {e.code()} - {e.details()}")
         except Exception as e:
-            raise Exception(f"Error in streaming request to WorkerNode for replica {actual_replica_id}: {e}")
+            raise Exception(f"Error in streaming request to Replica for replica {actual_replica_id}: {e}")
         finally:
             # Decrement request count
             async with self.replica_lock:
@@ -161,32 +144,23 @@ class DeploymentHandle:
         Send a streaming request to the best available replica via the WorkerNode.
         This method returns an async generator that yields Server Sent Events.
         """
-        first_worker_address, second_worker_address, first_replica_id, second_replica_id = await self.pick_next_replica()
+        
+        replica_address, replica_id = await self.pick_next_replica()
+        
+       
         
         print(f"[DeploymentHandle:{self.deployment_id}] Starting streaming request via WorkerNode.")
 
-        # Try first replica
-        if first_replica_id and first_worker_address:
-            print(f"[DeploymentHandle:{self.deployment_id}] Attempt 1: Targeting replica {first_replica_id} via WorkerNode at {first_worker_address}.")
+        # Try the replica
+        if replica_id and replica_address:
+            print(f"[DeploymentHandle:{self.deployment_id}]  Targeting replica {replica_id} via WorkerNode at {replica_address}.")
             try:
-                async for token_data in self._attempt_streaming_request_to_worker_node(first_replica_id, first_worker_address, message):
+                async for token_data in self._attempt_streaming_request_to_worker_node(replica_id, replica_address, message):
                     #print(f"[DeploymentHandle:{self.deployment_id}] Sending token: '{token_data}'")
                     yield token_data
                 return  # Successfully streamed, return
             except Exception as e:
-                print(f"Error in streaming request to WorkerNode for replica {first_replica_id}: {e}")
-        else:
-            print(f"[DeploymentHandle:{self.deployment_id}] No valid first replica candidate found.")
-
-        # Try second replica if first failed
-        if second_replica_id and second_worker_address:
-            print(f"[DeploymentHandle:{self.deployment_id}] Attempt 2: Targeting replica {second_replica_id} via WorkerNode at {second_worker_address}.")
-            try:
-                async for token_data in self._attempt_streaming_request_to_worker_node(second_replica_id, second_worker_address, message):
-                    yield token_data
-                return  # Successfully streamed, return
-            except Exception as e:
-                raise Exception(f"Error in streaming request to WorkerNode for replica {second_replica_id}: {e}")
+                print(f"Error in streaming request to WorkerNode for replica {replica_id}: {e}")
         else:
            raise Exception(f"No valid replicas found")
 

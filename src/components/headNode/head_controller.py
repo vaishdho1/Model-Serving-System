@@ -166,6 +166,8 @@ class HeadController(
        
         worker_address = f"{request.node_address}:{request.port}"
         await self.replica_queue.put((worker_address, 2))
+        #Directly calling creation of replica here
+        #await self.create_replica(worker_address, 2)
         #await self.replica_queue.put((worker_address, 3))
         #asyncio.create_task(self.replica_creation(worker_address))
         return headnode_service_pb2.RegisterReply(ack=True)
@@ -178,15 +180,18 @@ class HeadController(
                 replica_info = await self.replica_queue.get()
                 #Waiting for the node to start up, this is a hack to make sure the node is ready to receive requests
                 await asyncio.sleep(3)
+                 
                 
                 #This should never happen, if it does, need to fix it
                 if not isinstance(replica_info, tuple) or len(replica_info) != 2:
                     print(f"[HeadController] Error: Invalid replica_info format: {replica_info}")
                     continue
-                    
+
                 address, deployment_id = replica_info
-                await self.create_replica(address, deployment_id)
-                await asyncio.sleep(2)
+                print(f"[HeadController] Spawning creation task for deployment {deployment_id} on {address}")
+                asyncio.create_task(self.create_replica(address, deployment_id))
+                # Mark the queue item as processed so the queue knows we've handled it.
+                self.replica_queue.task_done()
             except Exception as e:
                 print(f"[HeadController] Error in replica creation loop: {e}")
                 # Continue the loop even if there's an error
@@ -212,17 +217,19 @@ class HeadController(
         try:
             response = await try_send_with_retries(stub.CreateReplica, request, num_attempts=3, delay_seconds=2)
             # Add replica to the deployment manager and update the routing table
-            print(f"[HeadController] Response from create replica: {response}")
+           
             if response.created:
+                print(f"[HeadController] Adding replica to deployment {deployment_id}")
                 await self.deployment_manager.add_replica_to_deployment(
                     deployment_id, 
                     str(response.worker_id), 
-                    str(response.replica_id), 
-                    address, 
-                    _num_cpus, 
-                    _num_gpus, 
-                    initial_state="RUNNING"
+                    #Todo: Code for this
+                    replicas = response.replicas, 
+                    num_cpus = _num_cpus,
+                    num_gpus = _num_gpus,
+                    worker_address = response.worker_address
                 )
+                print(f"[HeadController] Deployment manager updated")
                 await self._on_deployment_change()
             return response
         except Exception as e:

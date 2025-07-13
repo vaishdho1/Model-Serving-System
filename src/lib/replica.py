@@ -7,14 +7,16 @@ from src.lib import FutureManager
 from src.generated import headnode_service_pb2, worker_service_pb2, replica_service_pb2
 
 class Replica:
-    def __init__(self, pid, worker_id, stub, headnode_stub, deployment_id):
+    def __init__(self, pid, replica_id, worker_id, stub, headnode_stub, deployment_id, port):
         self.pid = pid  # Using self.pid as the replica's identifier for logging
+        self.replica_id = replica_id
         self.worker_id = worker_id
         self.stub = stub # This is a synchronous stub
         self.headnode_stub = headnode_stub
         self.status = "idle"  # "idle" or "processing"
         self.deployment_id = deployment_id
         self.active_requests = 0
+        self.port = port
         #self.max_concurrent_requests = 128  # Limit concurrent requests per replica
        
 

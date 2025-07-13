@@ -3,11 +3,33 @@ global:
 
 scrape_configs:
 
-  # Job to scrape application and vLLM metrics from your replicas
-  - job_name: 'vllm_replicas'
+  # Job to scrape application and vLLM metrics from your replicas (port 9000)
+  - job_name: 'vllm_replicas_9000'
     ec2_sd_configs:
       - region: us-east-1
         port: 9000 # The port your replica's Python app exposes metrics on
+    relabel_configs:
+      # MODIFIED: This now looks for the 'Service' tag with the value 'ModelScheduler'
+      - source_labels: [__meta_ec2_tag_Service]
+        regex: 'ModelScheduler'
+        action: keep
+
+  # Job to scrape application and vLLM metrics from your replicas (port 9001)
+  - job_name: 'vllm_replicas_9001'
+    ec2_sd_configs:
+      - region: us-east-1
+        port: 9001 # The port your replica's Python app exposes metrics on
+    relabel_configs:
+      # MODIFIED: This now looks for the 'Service' tag with the value 'ModelScheduler'
+      - source_labels: [__meta_ec2_tag_Service]
+        regex: 'ModelScheduler'
+        action: keep
+
+  # Job to scrape application and vLLM metrics from your replicas (port 9002)
+  - job_name: 'vllm_replicas_9002'
+    ec2_sd_configs:
+      - region: us-east-1
+        port: 9002 # The port your replica's Python app exposes metrics on
     relabel_configs:
       # MODIFIED: This now looks for the 'Service' tag with the value 'ModelScheduler'
       - source_labels: [__meta_ec2_tag_Service]

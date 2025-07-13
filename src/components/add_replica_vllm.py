@@ -44,8 +44,9 @@ FIRST_TOKEN_LATENCY = Histogram(
         )
        
 class ReplicaManager(replica_service_pb2_grpc.WorkerServiceServicer):
-    def __init__(self, parent_port, replica_id, port, deployment_name, deployment_id, num_cpus=1, num_gpus=0):
+    def __init__(self, parent_port, replica_id, port, deployment_name, deployment_id,metrics_port, num_cpus=1, num_gpus=0):
         self.parent_port = parent_port
+        self.metrics_port = metrics_port
         self.replica_id = replica_id
         self.port = port
         self.deployment_name = deployment_name
@@ -66,7 +67,7 @@ class ReplicaManager(replica_service_pb2_grpc.WorkerServiceServicer):
 
         print(f"[ReplicaManager-{self.replica_id}] Initializing with {num_cpus} CPUs, {num_gpus} GPUs")
          # Start Prometheus metrics server
-        start_http_server(9000) 
+        start_http_server(self.metrics_port) 
         self.init_model()
         #This polls vllm metrics to send to the head_controller for autoscaling decisions
         asyncio.create_task(self.poll_metrics_periodically())
@@ -85,13 +86,13 @@ class ReplicaManager(replica_service_pb2_grpc.WorkerServiceServicer):
     
             engine_args = AsyncEngineArgs(
                 model=self.model_id,
-                max_num_batched_tokens=65536,  
+                max_num_batched_tokens=131072,  
                 max_num_seqs=512,             
                 max_model_len=2048,          
                 dtype="float16",             
                 trust_remote_code=True,
                 device="cuda",               
-                gpu_memory_utilization=0.85, 
+                gpu_memory_utilization=0.45, 
                   
             )
             self.engine = AsyncLLMEngine.from_engine_args(engine_args)
@@ -112,7 +113,7 @@ class ReplicaManager(replica_service_pb2_grpc.WorkerServiceServicer):
         # Default to CPU if no GPU requested or available
         return "cpu"
     
-    async def StreamGenerate(self, request, context):
+    async def SendRequest(self, request, context):
         start_time = time.time()
         
         raw_prompt = request.prompt
@@ -157,7 +158,7 @@ class ReplicaManager(replica_service_pb2_grpc.WorkerServiceServicer):
                         new_text = current_text[sent_position:]
                         if new_text:
                             #print(f"[ReplicaManager-{self.replica_id}] Sending token: '{new_text}'")
-                            yield replica_service_pb2.TokenChunk(text=new_text, is_error=False)
+                            yield replica_service_pb2.ReplicaReply(text=new_text, is_error=False)
                             sent_position = current_length
                 
                 # If finished, break out of the loop
@@ -171,7 +172,7 @@ class ReplicaManager(replica_service_pb2_grpc.WorkerServiceServicer):
                 ).inc()
         except Exception as e:
             print(f"[ReplicaManager-{self.replica_id}] vLLM Error: {str(e)}")
-            yield replica_service_pb2.TokenChunk(text=f"[vLLM Error] {str(e)}", is_error=True)
+            yield replica_service_pb2.ReplicaReply(text=f"[vLLM Error] {str(e)}", is_error=True)
             REQUEST_COUNT.labels(
                     deployment_name=self.deployment_name,
                     replica_id=str(self.replica_id),
@@ -188,7 +189,7 @@ class ReplicaManager(replica_service_pb2_grpc.WorkerServiceServicer):
     
     async def poll_metrics_periodically(self):
     
-        url = f"http://localhost:{9000}/metrics"
+        url = f"http://localhost:{self.metrics_port}/metrics"
         while True:
             try:
                 response = requests.get(url)
@@ -229,12 +230,17 @@ class ReplicaManager(replica_service_pb2_grpc.WorkerServiceServicer):
                 pid = self.pid,
                 port = self.port,
                 state = self.replica_state,
-                deployment_id = self.deployment_id)
+                deployment_id = self.deployment_id,
+                deployment_name = self.deployment_name
+                )
         )
         
         if response:  # Only print success if we got a response
-            print(f"[ReplicaManager-{self.replica_id}] Replica registered, starting health updates")
-            asyncio.create_task(self.send_health_updates())
+            print(f"[ReplicaManager-{self.replica_id}] Replica registered")
+        else:
+            print(f"[ReplicaManager-{self.replica_id}] Replica registration failed")
+            os.kill(self.pid, signal.SIGTERM)
+            
 
 
     def load_and_run_model(self,model,input):
@@ -257,7 +263,9 @@ class ReplicaManager(replica_service_pb2_grpc.WorkerServiceServicer):
         print(f"[ReplicaManager-{self.replica_id}] Sending output to worker {res}")
         return worker_service_pb2.TaskReply(result=res)
     '''
-    
+    #We will instead add metrics for autoscaling
+
+    '''
     async def send_health_updates(self):
         while True:
             success_this_cycle = False # Reset for each health update cycle
@@ -292,7 +300,7 @@ class ReplicaManager(replica_service_pb2_grpc.WorkerServiceServicer):
             # Wait for the configured interval before the next health update cycle
             await asyncio.sleep(self.health_update_interval)
 
-
+    '''
         
 
 
@@ -306,11 +314,11 @@ async def main():
     parser.add_argument("--deployment_id", type=str, required=True)
     parser.add_argument("--num_cpus", type=str, required=True)
     parser.add_argument("--num_gpus", type=str, required=True)
-
+    parser.add_argument("--metrics_port", type=str, required=True)
     args = parser.parse_args()
     
     # Create replica manager and initialize the model
-    replica_manager = ReplicaManager(args.parent_port, int(args.replica_id), args.port, args.deployment_name, int(args.deployment_id), int(args.num_cpus), int(args.num_gpus))
+    replica_manager = ReplicaManager(args.parent_port, int(args.replica_id), args.port, args.deployment_name, int(args.deployment_id), int(args.metrics_port), int(args.num_cpus), int(args.num_gpus))
     
     # Start the server
     server = grpc.aio.server()

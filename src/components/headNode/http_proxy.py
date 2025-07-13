@@ -12,7 +12,7 @@ from fastapi.responses import Response, PlainTextResponse
 from starlette.responses import StreamingResponse # For streaming back the response
 import uvicorn # For running FastAPI
 from xml.dom.pulldom import parseString
-
+from src.lib import local_metrics
 from src.generated import headnode_service_pb2, headnode_service_pb2_grpc
 from src.lib.proxy_manager import ProxyManager
 from src.lib.deployment_manager import DeploymentManager
@@ -22,14 +22,14 @@ from src.lib.configurations import proxy_ping_max_retries, proxy_ping_retry_dela
 from src.generated import worker_service_pb2, worker_service_pb2_grpc, proxy_service_pb2, proxy_service_pb2_grpc
 from src.generated import common_pb2 # Import common_pb2
 from src.lib.model_config import model_config_manager
-
+from aioprometheus import render
 import json # Added back
 import base64 # Added back
 
 # Prometheus metrics
 
-from aioprometheus import Counter, Histogram, render, REGISTRY
 
+'''
 PROXY_REQUEST_LATENCY = Histogram(
     "proxy_request_latency_seconds",
     "End-to-end request latency from proxy perspective",
@@ -42,6 +42,7 @@ PROXY_REQUEST_COUNT = Counter(
     "proxy_requests_total",
     "Total requests handled by proxy",
 )
+'''
 # --- FastAPI App Definition ---
 app = FastAPI()
 
@@ -87,7 +88,8 @@ class HttpProxy():
         # Add new or update existing deployments
             for deployment_id, dep_info_proto in update.current_deployments.items():
                 self.routing_table[dep_info_proto.deployment_name] = DeploymentHandle(deployment_id, dep_info_proto)
-            print(f"[HttpProxy:{self.proxy_id}] Routing table updated. Current deployments: {list(self.routing_table.keys())}")
+            print(f"[HttpProxy:{self.proxy_id}] Routing table updated. Current deployments: {self.routing_table}")
+            #print(f"[HttpProxy:{self.proxy_id}] Routing table updated. Current deployments: {list(self.routing_table.keys())}")
             
     
     async def subscribe_to_head_node(self):
@@ -156,16 +158,16 @@ class HttpProxy():
                 total_time = time.time() - start_time
                 success_labels = {"deployment_name": deployment_name, "status": "success"}
                 if first_token_received:
-                   PROXY_FIRST_TOKEN_LATENCY.observe({"deployment_name": deployment_name}, ttft)
-                PROXY_REQUEST_LATENCY.observe(success_labels, total_time)
-                PROXY_REQUEST_COUNT.inc(success_labels)
+                   local_metrics.PROXY_FIRST_TOKEN_LATENCY.observe({"deployment_name": deployment_name}, ttft)
+                local_metrics.PROXY_REQUEST_LATENCY.observe(success_labels, total_time)
+                local_metrics.PROXY_REQUEST_COUNT.inc(success_labels)
 
             except Exception as e:
                 print(f"Error in stream_generator for {deployment_name}: {e}")
                 total_time = time.time() - start_time
                 error_labels = {"deployment_name": deployment_name, "status": "error"}
-                PROXY_REQUEST_LATENCY.observe(error_labels, total_time)
-                PROXY_REQUEST_COUNT.inc(error_labels)
+                local_metrics.PROXY_REQUEST_LATENCY.observe(error_labels, total_time)
+                local_metrics.PROXY_REQUEST_COUNT.inc(error_labels)
                 
                 yield "Error in streaming, retry"
         
@@ -180,13 +182,13 @@ class HttpProxy():
         )
 
 @app.get("/metrics")
-async def metrics(request: Request):
+async def metrics_endpoint(request: Request):
     """
     Prometheus metrics endpoint.
     Uses aioprometheus render() to expose all collected metrics.
     """
     accept_header = request.headers.get("accept", "")
-    content, http_headers = render(REGISTRY, [accept_header])
+    content, http_headers = render(local_metrics.REGISTRY, [accept_header]) # Use the imported REGISTRY
     return Response(content, media_type=http_headers["Content-Type"])
 
   

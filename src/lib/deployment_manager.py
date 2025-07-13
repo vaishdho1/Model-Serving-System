@@ -8,20 +8,18 @@ from typing import Dict, List, Optional, Literal
 from src.generated import headnode_service_pb2, worker_service_pb2
 from src.lib.configurations import *
 
-logging.basicConfig(level=logging.WARNING)
-logger = logging.getLogger("DeploymentManager")
+
 
 ReplicaStateName = Literal["STARTING", "RUNNING", "DRAINING", "SHUTDOWN"]
 
 @dataclass
 class ReplicaInfo:
     replica_num: str  # node_id#replica_num
-    worker_address: str
+    replica_address: str
     state: ReplicaStateName
 
 @dataclass
 class DeploymentHandle:
-    deployment_id: int
     deployment_name: str
     version: str
     num_cpus: int
@@ -51,7 +49,7 @@ class DeploymentManager:
         
         dep = self.deployments.get(deployment_id)
         if not dep:
-            dep = DeploymentHandle(deployment_id, name, version, num_cpus, num_gpus)
+            dep = DeploymentHandle(name, version, num_cpus, num_gpus)
             self.deployments[deployment_id] = dep
         else:
             dep.deployment_name = name
@@ -67,19 +65,23 @@ class DeploymentManager:
                 for r in dep.replicas:
                     self.replica_map.pop(self._replica_id(r.worker_address, r.replica_num), None)
                 return True
-            logger.warning(f"Attempted to remove non-existent deployment: {deployment_id}")
+            print(f"[DeploymentManager] Attempted to remove non-existent deployment: {deployment_id}")
             return False
 
-    async def add_replica_to_deployment(self, deployment_id: int, worker_id: str, replica_id_num: str, worker_address: str, num_cpus: int, num_gpus: int, initial_state: ReplicaStateName = "STARTING") -> bool:
+    async def add_replica_to_deployment(self, deployment_id: int, worker_id: str, replicas: List[worker_service_pb2.ReplicaContent], num_cpus: int, num_gpus: int, worker_address: str) -> bool:
+        print(f"[DeploymentManager] Adding replicas to deployment {deployment_id}")
         async with self._lock:
             dep = self.deployments.get(deployment_id)
             if not dep:
-                logger.error(f"Cannot add replica. Deployment {deployment_id} not found.")
+                print(f"[DeploymentManager] Cannot add replica. Deployment {deployment_id} not found.")
                 return False
-            replica_info = ReplicaInfo(replica_num=self._replica_id(worker_id, replica_id_num), worker_address=worker_address, state=initial_state)
-            dep.replicas.append(replica_info)
-            self.replica_map[self._replica_id(worker_id, replica_id_num)] = replica_info
-            await self.auto_scale_manager.add_replica(worker_id, replica_id_num, num_cpus, num_gpus)
+           
+            for replica in replicas:
+               
+                replica_info = ReplicaInfo(replica_num=self._replica_id(worker_id, replica.replica_id), replica_address=f"{worker_address}:{replica.port}", state="RUNNING")
+                dep.replicas.append(replica_info)
+                self.replica_map[self._replica_id(worker_id, replica.replica_id)] = replica_info
+                await self.auto_scale_manager.add_replica(worker_id, replica.replica_id, num_cpus, num_gpus)
             await self.node_info_cache.update_resources(int(worker_id),num_cpus, num_gpus , add=True)
             return True
 
@@ -91,7 +93,9 @@ class DeploymentManager:
                 replica.state = new_state
                 return True
             return False
-
+    async def get_deployment(self, deployment_id: int) -> Optional[DeploymentHandle]:
+        async with self._lock:
+            return self.deployments.get(deployment_id)
     async def remove_replica_from_deployment(self, deployment_id: int, replica_id: str, worker_id: str) -> bool:
         async with self._lock:
             rid = self._replica_id(worker_id, replica_id)
@@ -102,34 +106,24 @@ class DeploymentManager:
                 num_cpus, num_gpus = await self.auto_scale_manager.remove_replica(worker_id, replica_id)
                 await self.node_info_cache.update_resources(int(worker_id),num_cpus,num_gpus , add=False)
                 return True
-            logger.warning(f"Replica {replica_id} not found in deployment {deployment_id} for removal.")
+            print(f"[DeploymentManager] Replica {replica_id} not found in deployment {deployment_id} for removal.")
             return False
         
-    async def get_replica_info(self, replica_id: str) -> Optional[ReplicaInfo]:
-        async with self._lock:
-            return self.replica_map.get(replica_id)
-
-    async def get_deployment(self, deployment_id: int) -> Optional[DeploymentHandle]:
-        async with self._lock:
-            return self.deployments.get(deployment_id)
-
-    async def get_all_deployments(self) -> List[DeploymentHandle]:
-        async with self._lock:
-            return list(self.deployments.values())
+    
 
     async def get_current_routing_table(self) -> headnode_service_pb2.RoutingUpdate:
         """Constructs a RoutingUpdate protobuf message from the current deployment state."""
         async with self._lock:
             current_deployments = {
                 dep_id: headnode_service_pb2.DeploymentInfoMessage(
-                    deployment_id=dep_handle.deployment_id,
+                    deployment_id=dep_id,
                     deployment_name=dep_handle.deployment_name,
                     version=dep_handle.version,
                     status="ACTIVE",
                     replicas=[
                         headnode_service_pb2.ReplicaInfo(
                             replica_id=r.replica_num,
-                            address=r.worker_address,
+                            address=r.replica_address,
                             state=r.state
                         ) for r in dep_handle.replicas
                     ]

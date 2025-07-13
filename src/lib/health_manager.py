@@ -23,8 +23,8 @@ class HealthManager:
                 change_detected = True
                 # This takes care of the auto scale manager and node info cache
                 await self.head_controller.deployment_manager.remove_replica_from_deployment(replica_state.deployment_id, replica_state.replica_id, worker_id)
-                #Put the replica in the replica queue to be created later on the same worker
-                await self.head_controller.replica_queue.put((address,replica_state.deployment_id))
+                #Will not be doing this anymore as the scheduler will handle this
+                #await self.head_controller.replica_queue.put((address,replica_state.deployment_id))
                 
         #If there is a change in the deployment, we need to update the routing table
         if change_detected:
@@ -48,9 +48,12 @@ class HealthManager:
                     health_logger.error(f"[HealthManager] Error pinging node {node.node_address}: {e}")
                     alive = False
                 if not is_alive:
-                    #Search for all the replicas in this node,
-                   # remove them from the deployment manager and node info cache
-                   # Start these replicas elsewhere
+                    '''
+                    Todo:
+                    Search for all the replicas in this node,
+                    remove them from the deployment manager and node info cache
+                    Start these replicas elsewhere
+                   '''
                     pass
             await asyncio.sleep(worker_ping_interval)  # Ping interval
 

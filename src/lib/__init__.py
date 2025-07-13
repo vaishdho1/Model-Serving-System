@@ -13,7 +13,8 @@ from .replica import Replica
 from . import model_config
 from . import utils
 from . import logging_config
-from .cloud_vm import *
+from .cloud_vm import * 
+from . import local_metrics
 # Optional: define __all__ to control what 'from src.lib import *' imports
 #Check cloud_vm here
-__all__ = ['ProxyManager', 'DeploymentManager', 'DeploymentHandle', 'HealthManager', 'HeadStoreClient', 'helpers', 'FutureManager', 'configurations', 'AutoScaleManager', 'Replica', 'model_config', 'NodeInfo', 'utils', 'logging_config', 'VMManager', 'AWSVMManager']    
+__all__ = ['ProxyManager', 'DeploymentManager', 'DeploymentHandle', 'HealthManager', 'HeadStoreClient', 'helpers', 'FutureManager', 'configurations', 'AutoScaleManager', 'Replica', 'model_config', 'NodeInfo', 'utils', 'logging_config', 'VMManager', 'AWSVMManager', 'local_metrics']    

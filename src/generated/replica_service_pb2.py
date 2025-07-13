@@ -16,17 +16,17 @@ from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
 from . import common_pb2 as common__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x15replica_service.proto\x12\x06protos\x1a\x1bgoogle/protobuf/empty.proto\x1a\x0c\x63ommon.proto\"\x1f\n\rPromptRequest\x12\x0e\n\x06prompt\x18\x01 \x01(\t\",\n\nTokenChunk\x12\x0c\n\x04text\x18\x01 \x01(\t\x12\x10\n\x08is_error\x18\x02 \x01(\x08\x32{\n\rWorkerService\x12=\n\x0eStreamGenerate\x12\x15.protos.PromptRequest\x1a\x12.protos.TokenChunk0\x01\x12+\n\x04Ping\x12\x16.google.protobuf.Empty\x1a\x0b.protos.Ackb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x15replica_service.proto\x12\x06protos\x1a\x1bgoogle/protobuf/empty.proto\x1a\x0c\x63ommon.proto\" \n\x0eReplicaRequest\x12\x0e\n\x06prompt\x18\x02 \x01(\t\".\n\x0cReplicaReply\x12\x0c\n\x04text\x18\x01 \x01(\t\x12\x10\n\x08is_error\x18\x02 \x01(\x08\x32{\n\rWorkerService\x12=\n\x0bSendRequest\x12\x16.protos.ReplicaRequest\x1a\x14.protos.ReplicaReply0\x01\x12+\n\x04Ping\x12\x16.google.protobuf.Empty\x1a\x0b.protos.Ackb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'replica_service_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
-  _globals['_PROMPTREQUEST']._serialized_start=76
-  _globals['_PROMPTREQUEST']._serialized_end=107
-  _globals['_TOKENCHUNK']._serialized_start=109
-  _globals['_TOKENCHUNK']._serialized_end=153
-  _globals['_WORKERSERVICE']._serialized_start=155
-  _globals['_WORKERSERVICE']._serialized_end=278
+  _globals['_REPLICAREQUEST']._serialized_start=76
+  _globals['_REPLICAREQUEST']._serialized_end=108
+  _globals['_REPLICAREPLY']._serialized_start=110
+  _globals['_REPLICAREPLY']._serialized_end=156
+  _globals['_WORKERSERVICE']._serialized_start=158
+  _globals['_WORKERSERVICE']._serialized_end=281
 # @@protoc_insertion_point(module_scope)

@@ -7,16 +7,18 @@ import "common.proto";
 
 
 service WorkerService{
-   rpc StreamGenerate (PromptRequest) returns (stream TokenChunk);
+   rpc SendRequest(ReplicaRequest) returns(stream ReplicaReply);
     //Ping from the workerNode
    rpc Ping(google.protobuf.Empty) returns (Ack);
 }
 
-message PromptRequest {
-  string prompt = 1;
+message ReplicaRequest {
+  string prompt = 2;
 }
 
-message TokenChunk {
+message ReplicaReply {
   string text = 1;
   bool is_error = 2;
 }
+
+

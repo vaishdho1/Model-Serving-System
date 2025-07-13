@@ -41,11 +41,6 @@ class ReplicaServiceStub(object):
         Args:
             channel: A grpc.Channel.
         """
-        self.sendHealthupdate = channel.unary_unary(
-                '/protos.ReplicaService/sendHealthupdate',
-                request_serializer=worker__service__pb2.HealthStatus.SerializeToString,
-                response_deserializer=worker__service__pb2.HealthReply.FromString,
-                _registered_method=True)
         self.RegisterReplica = channel.unary_unary(
                 '/protos.ReplicaService/RegisterReplica',
                 request_serializer=worker__service__pb2.replicaStatus.SerializeToString,
@@ -56,14 +51,9 @@ class ReplicaServiceStub(object):
 class ReplicaServiceServicer(object):
     """Missing associated documentation comment in .proto file."""
 
-    def sendHealthupdate(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
     def RegisterReplica(self, request, context):
-        """Missing associated documentation comment in .proto file."""
+        """rpc sendHealthupdate(HealthStatus) returns (HealthReply);
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
@@ -71,11 +61,6 @@ class ReplicaServiceServicer(object):
 
 def add_ReplicaServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
-            'sendHealthupdate': grpc.unary_unary_rpc_method_handler(
-                    servicer.sendHealthupdate,
-                    request_deserializer=worker__service__pb2.HealthStatus.FromString,
-                    response_serializer=worker__service__pb2.HealthReply.SerializeToString,
-            ),
             'RegisterReplica': grpc.unary_unary_rpc_method_handler(
                     servicer.RegisterReplica,
                     request_deserializer=worker__service__pb2.replicaStatus.FromString,
@@ -91,33 +76,6 @@ def add_ReplicaServiceServicer_to_server(servicer, server):
  # This class is part of an EXPERIMENTAL API.
 class ReplicaService(object):
     """Missing associated documentation comment in .proto file."""
-
-    @staticmethod
-    def sendHealthupdate(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/protos.ReplicaService/sendHealthupdate',
-            worker__service__pb2.HealthStatus.SerializeToString,
-            worker__service__pb2.HealthReply.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
 
     @staticmethod
     def RegisterReplica(request,
@@ -161,11 +119,6 @@ class HeadNodeServiceStub(object):
                 request_serializer=worker__service__pb2.ReplicaCreationRequest.SerializeToString,
                 response_deserializer=worker__service__pb2.ReplicaCreationReply.FromString,
                 _registered_method=True)
-        self.SendRequest = channel.unary_stream(
-                '/protos.HeadNodeService/SendRequest',
-                request_serializer=worker__service__pb2.ReplicaRequest.SerializeToString,
-                response_deserializer=worker__service__pb2.ReplicaReply.FromString,
-                _registered_method=True)
         self.Ping = channel.unary_unary(
                 '/protos.HeadNodeService/Ping',
                 request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
@@ -183,15 +136,9 @@ class HeadNodeServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def SendRequest(self, request, context):
+    def Ping(self, request, context):
         """Headnode calls
         """
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def Ping(self, request, context):
-        """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
@@ -203,11 +150,6 @@ def add_HeadNodeServiceServicer_to_server(servicer, server):
                     servicer.CreateReplica,
                     request_deserializer=worker__service__pb2.ReplicaCreationRequest.FromString,
                     response_serializer=worker__service__pb2.ReplicaCreationReply.SerializeToString,
-            ),
-            'SendRequest': grpc.unary_stream_rpc_method_handler(
-                    servicer.SendRequest,
-                    request_deserializer=worker__service__pb2.ReplicaRequest.FromString,
-                    response_serializer=worker__service__pb2.ReplicaReply.SerializeToString,
             ),
             'Ping': grpc.unary_unary_rpc_method_handler(
                     servicer.Ping,
@@ -242,33 +184,6 @@ class HeadNodeService(object):
             '/protos.HeadNodeService/CreateReplica',
             worker__service__pb2.ReplicaCreationRequest.SerializeToString,
             worker__service__pb2.ReplicaCreationReply.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def SendRequest(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_stream(
-            request,
-            target,
-            '/protos.HeadNodeService/SendRequest',
-            worker__service__pb2.ReplicaRequest.SerializeToString,
-            worker__service__pb2.ReplicaReply.FromString,
             options,
             channel_credentials,
             insecure,

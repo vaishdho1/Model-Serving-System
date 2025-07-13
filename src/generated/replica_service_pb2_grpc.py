@@ -41,10 +41,10 @@ class WorkerServiceStub(object):
         Args:
             channel: A grpc.Channel.
         """
-        self.StreamGenerate = channel.unary_stream(
-                '/protos.WorkerService/StreamGenerate',
-                request_serializer=replica__service__pb2.PromptRequest.SerializeToString,
-                response_deserializer=replica__service__pb2.TokenChunk.FromString,
+        self.SendRequest = channel.unary_stream(
+                '/protos.WorkerService/SendRequest',
+                request_serializer=replica__service__pb2.ReplicaRequest.SerializeToString,
+                response_deserializer=replica__service__pb2.ReplicaReply.FromString,
                 _registered_method=True)
         self.Ping = channel.unary_unary(
                 '/protos.WorkerService/Ping',
@@ -56,7 +56,7 @@ class WorkerServiceStub(object):
 class WorkerServiceServicer(object):
     """Missing associated documentation comment in .proto file."""
 
-    def StreamGenerate(self, request, context):
+    def SendRequest(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -72,10 +72,10 @@ class WorkerServiceServicer(object):
 
 def add_WorkerServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
-            'StreamGenerate': grpc.unary_stream_rpc_method_handler(
-                    servicer.StreamGenerate,
-                    request_deserializer=replica__service__pb2.PromptRequest.FromString,
-                    response_serializer=replica__service__pb2.TokenChunk.SerializeToString,
+            'SendRequest': grpc.unary_stream_rpc_method_handler(
+                    servicer.SendRequest,
+                    request_deserializer=replica__service__pb2.ReplicaRequest.FromString,
+                    response_serializer=replica__service__pb2.ReplicaReply.SerializeToString,
             ),
             'Ping': grpc.unary_unary_rpc_method_handler(
                     servicer.Ping,
@@ -94,7 +94,7 @@ class WorkerService(object):
     """Missing associated documentation comment in .proto file."""
 
     @staticmethod
-    def StreamGenerate(request,
+    def SendRequest(request,
             target,
             options=(),
             channel_credentials=None,
@@ -107,9 +107,9 @@ class WorkerService(object):
         return grpc.experimental.unary_stream(
             request,
             target,
-            '/protos.WorkerService/StreamGenerate',
-            replica__service__pb2.PromptRequest.SerializeToString,
-            replica__service__pb2.TokenChunk.FromString,
+            '/protos.WorkerService/SendRequest',
+            replica__service__pb2.ReplicaRequest.SerializeToString,
+            replica__service__pb2.ReplicaReply.FromString,
             options,
             channel_credentials,
             insecure,

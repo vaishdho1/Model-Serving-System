@@ -41,13 +41,12 @@ message ReplicaState
   uint32 replica_id = 1;
   uint32 deployment_id = 2; //What deployment this belongs to
   string status = 3; //Whether the actor is dead or alive
+  string replica_port = 4; //Port of the replica
 }
 
 message HealthStatusUpdate {
   uint32 worker_id = 1; // The worker ID
   string worker_address = 4;
-  string port = 5;
-  //string state = 2; // Worker state
   repeated ReplicaState replica_states = 3;
 }
 

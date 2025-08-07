@@ -14,8 +14,7 @@ class HealthManager:
         # Simulating a change that requires routing update
         worker_id = request.worker_id
         worker_address = request.worker_address
-        worker_port = request.port
-        address = f"{worker_address}:{worker_port}"
+        
         change_detected = False
         for replica_state in request.replica_states:
             print(f"[HealthManager] Replica state: {replica_state}")

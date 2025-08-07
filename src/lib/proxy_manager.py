@@ -5,7 +5,7 @@ from src.generated import proxy_service_pb2, proxy_service_pb2_grpc
 from src.lib.helpers import try_send_with_retries
 from src.lib.configurations import proxy_heartbeat_interval
 from google.protobuf import empty_pb2
-
+import os
 class ProxyManager():
     def __init__(self, node_port, http_port, grpc_port):
         self.node_port = node_port
@@ -18,13 +18,36 @@ class ProxyManager():
     
 
     def start_http_proxy(self):
+        
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+        #Make sure the build exists under /build directory of the project root
+        cpp_executable_path = "http_proxy"
+      
+        
+        # Command to run the C++ binary with its arguments
         cmd = [
-            "python3", "-u", "-m", "src.components.headNode.http_proxy",
-            "--parent_port", str(self.node_port),
+            cpp_executable_path,
             "--http_port", str(self.http_port),
-            "--grpc_port", str(self.grpc_port),
+            "--parent_port", str(self.node_port),
+            "--grpc_port", str(self.grpc_port)
         ]
-        print(f"[ProxyManager] Starting http proxy")
+        '''
+        # The GDB command is useful for debugging but can hide output.
+        # We are temporarily disabling it to see the direct output of the proxy.
+        
+        cmd = [
+            "gdb", "-batch", 
+            "-ex", "run", 
+            "-ex", "bt", 
+            "--args", 
+            cpp_executable_path,
+            "--http_port", str(self.http_port),
+            "--parent_port", str(self.node_port),
+            "--grpc_port", str(self.grpc_port)
+        ]
+        '''
+        
+        print(f"[ProxyManager] Starting http proxy...")
         
         try:
             log_file_name = f"proxy.log"

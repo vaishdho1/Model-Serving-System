@@ -1,0 +1,87 @@
+cmake_minimum_required(VERSION 3.16)
+project(ModelServer CXX)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
+
+# --- Define Build Options ---
+option(BUILD_REPLICA_SERVER "Build the replica_server executable" ON)
+
+# --- Common Proto Generation (Needed by both targets) ---
+# For Ubuntu 22.04, we need to find gRPC differently
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(GRPC REQUIRED grpc++ grpc protobuf)
+
+set(PROTO_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/protos)
+set(PROTO_GEN_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/generated)
+file(GLOB PROTO_FILES "${PROTO_SRC_DIR}/*.proto")
+
+set(PROTO_GENERATED_SOURCES "")
+foreach(PROTO_FILE ${PROTO_FILES})
+    get_filename_component(BASENAME ${PROTO_FILE} NAME_WE)
+    list(APPEND PROTO_GENERATED_SOURCES
+        "${PROTO_GEN_DIR}/${BASENAME}.pb.cc"
+        "${PROTO_GEN_DIR}/${BASENAME}.grpc.pb.cc"
+    )
+endforeach()
+
+# Find protoc and grpc_cpp_plugin
+find_program(PROTOC protoc)
+find_program(GRPC_CPP_PLUGIN grpc_cpp_plugin)
+
+if(NOT PROTOC)
+    message(FATAL_ERROR "protoc not found")
+endif()
+
+if(NOT GRPC_CPP_PLUGIN)
+    message(FATAL_ERROR "grpc_cpp_plugin not found")
+endif()
+
+add_custom_command(
+    OUTPUT ${PROTO_GENERATED_SOURCES}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${PROTO_GEN_DIR}
+    COMMAND ${PROTOC}
+        --proto_path=${PROTO_SRC_DIR}
+        --cpp_out=${PROTO_GEN_DIR}
+        --grpc_out=${PROTO_GEN_DIR}
+        --plugin=protoc-gen-grpc=${GRPC_CPP_PLUGIN}
+        ${PROTO_FILES}
+    DEPENDS ${PROTO_FILES}
+    COMMENT "Generating Protobuf C++ sources"
+)
+
+add_custom_target(generate_protos ALL DEPENDS ${PROTO_GENERATED_SOURCES})
+
+# --- Target: replica_server (Conditional Build) ---
+if(BUILD_REPLICA_SERVER)
+    message(STATUS "BUILD_REPLICA_SERVER is ON. Configuring target.")
+    
+    # Find dependencies specific to the replica_server
+    find_package(pybind11 REQUIRED)
+    find_package(prometheus-cpp REQUIRED)
+    find_package(Threads REQUIRED)
+    
+    add_executable(replica_server 
+        src/components/replica_server.cc 
+        ${PROTO_GENERATED_SOURCES}
+    )
+    add_dependencies(replica_server generate_protos)
+    
+    target_link_libraries(replica_server PRIVATE
+        ${GRPC_LIBRARIES}
+        pybind11::embed
+        prometheus-cpp::core
+        prometheus-cpp::pull
+        Threads::Threads
+    )
+    
+    target_include_directories(replica_server PRIVATE 
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${GRPC_INCLUDE_DIRS}
+    )
+    
+    target_compile_options(replica_server PRIVATE ${GRPC_CFLAGS_OTHER})
+    
+    install(TARGETS replica_server DESTINATION bin)
+endif() 

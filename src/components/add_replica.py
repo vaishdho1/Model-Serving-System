@@ -1,211 +1,156 @@
 # Start a replica server given the port and send ready reques
 from concurrent import futures
+from gc import disable
 import grpc
-from src.generated import worker_service_pb2, worker_service_pb2_grpc, replica_service_pb2_grpc, replica_service_pb2
+from src.generated import worker_service_pb2, worker_service_pb2_grpc, replica_service_pb2_grpc, replica_service_pb2, common_pb2
 import grpc
-from dataclasses import dataclass
-from concurrent import futures
-import subprocess
 import time
 import os
-import threading
-import queue
 import argparse
-from src.lib import configurations, HeadStoreClient, FutureManager, Replica, model_config
+from src.lib import model_config
 import signal
 import asyncio
 import torch
-import threading
-from transformers import AutoTokenizer, AutoModelForCausalLM, TextIteratorStreamer
-import accelerate
+from vllm import AsyncLLMEngine, SamplingParams
+from vllm.engine.arg_utils import AsyncEngineArgs
+from vllm.utils import random_uuid
+import requests
+from prometheus_client import Histogram, Counter, REGISTRY, start_http_server
+import aiohttp
+LATENCY_BUCKETS = [0.1, 0.5, 1, 5, 10, 30, 60, 120, 180]
 
+REQUEST_LATENCY = Histogram(
+            'replica_request_latency_seconds',
+            'Replica request latency in seconds',
+            ['deployment_name'],
+            buckets=LATENCY_BUCKETS,
+            registry=REGISTRY  # Use the same registry as vLLM
+        )
 
-'''
-The server is synchronous. It is stateless just does inference depending on the input that it gets.
-Todo: Add VLLM support for efficient inference
-'''
+REQUEST_COUNT = Counter(
+            'replica_requests_total',
+            'Total replica requests handled',
+            ['deployment_name', 'status'],
+            registry=REGISTRY  # Use the same registry as vLLM
+        )
 
-class ReplicaManager(replica_service_pb2_grpc.WorkerServiceServicer):
-    def __init__(self, parent_port, replica_id, port, deployment_name, deployment_id):
-        self.parent_port = parent_port
-        self.replica_id = replica_id
-        self.port = port
+FIRST_TOKEN_LATENCY = Histogram(
+            'replica_first_token_latency_seconds',
+            'Replica first token latency in seconds',
+            ['deployment_name'],
+            registry=REGISTRY  # Use the same registry as vLLM
+        )
+
+INTER_TOKEN_LATENCY = Histogram(
+            'replica_inter_token_latency_seconds',
+            'Replica inter token latency in seconds',
+            ['deployment_name'],
+            registry=REGISTRY  # Use the same registry as vLLM
+        )
+
+class ReplicaManager():
+    def __init__(self,deployment_name, deployment_id,metrics_port, loop):
+       
         self.deployment_name = deployment_name
         self.deployment_id = deployment_id
-        self.replica_state = "idle"
-        self.stub  = worker_service_pb2_grpc.ReplicaServiceStub(
-            grpc.insecure_channel(f"localhost:{parent_port}")
-        )
-        self.pid = os.getpid()
-        
-        self.health_update_interval = 5 
+        self.metrics_port = metrics_port
+        self.loop = loop
         self.init_model()
-        #Commented for now
-        self.register_replica()
-         # Start health update thread as a daemon thread
-         #Commented out for now
-        self.health_thread = threading.Thread(target=self.send_health_updates)
-        self.health_thread.daemon = True
-        self.health_thread.start()
+        start_http_server(self.metrics_port)
+        
+        
+        
+        
 
     def init_model(self):
-         #Use the deployment name to load the model from 
-         print(f"[ReplicaManager-{self.replica_id}] Initializing model")
-         #Load the required model from the model config
-         self.model_id = model_config.MODEL_CONFIGS[self.deployment_name].model_id
-         self.device = "cpu"
-         self.tokenizer = AutoTokenizer.from_pretrained(self.model_id)
+        #Use the deployment name to load the model from 
+        print(f"[ReplicaManager-{self.deployment_id}] Initializing model")
+        #Load the required model from the model config
+        self.model_id = model_config.MODEL_CONFIGS[self.deployment_name].model_id
 
-         if self.tokenizer.pad_token is None:
-            self.tokenizer.pad_token = self.tokenizer.eos_token
-
-         self.model = AutoModelForCausalLM.from_pretrained(
-            self.model_id,
-            torch_dtype=torch.float32,
-            device_map={"": self.device},
-            trust_remote_code=True
-        )
-         print(f"[ReplicaManager- {self.replica_id}] Model loaded successfully!")
-
-        
+        # Configure vLLM Engine, Todo: Check the configuration of vllm and what works here
+        try:
+            # Determine device configuration based on num_gpus
     
-    def StreamGenerate(self, request, context):
-        print(f"[ReplicaManager-{self.replica_id}] Streaming generate")
-        prompt = request.prompt
-        formatted = f"### Instruction:\n{prompt}\n\n### Response:\n"
-        inputs = self.tokenizer(formatted, return_tensors="pt")
-
-        streamer = TextIteratorStreamer(self.tokenizer, skip_prompt=True, skip_special_tokens=True)
-
-        generation_thread = threading.Thread(
-            target=self.model.generate,
-            kwargs={
-                "input_ids": inputs["input_ids"],
-                "attention_mask": inputs["attention_mask"],
-                "max_new_tokens": 100,
-                "temperature": 0.7,
-                "do_sample": True,
-                "streamer": streamer
-            }
-        )
-        generation_thread.start()
-
-        for token in streamer:
-            yield replica_service_pb2.TokenChunk(text=token)
-       
-    def send_with_retries(self, coro_func, *args, num_attempts=3, delay_seconds=2, **kwargs):
-        #This should try registering and if not succesful after num_attemps, it should kill itself
-        for attempt in range(1, num_attempts + 1):
-            try:
-                return coro_func(*args, **kwargs)
-            except grpc.RpcError as e:
-                print(f"gRPC error on attempt {attempt}/3 sending health update: code={e.code()}, details='{e.details()}'")
-        
-        print("Failed to send health update after 3 attempts. Terminating process.")
-        os.kill(self.pid, signal.SIGTERM)
-        return
-
-    def register_replica(self):
-        print(f"[ReplicaManager-{self.replica_id}] Registering replica")
-        
-        # Try to register, but only retry on failure
-        response = self.send_with_retries(
-            self.stub.RegisterReplica,
-            worker_service_pb2.replicaStatus(
-                replica_id = self.replica_id,
-                pid = self.pid,
-                port = self.port,
-                state = self.replica_state,
-                deployment_id = self.deployment_id)
-        )
-        
-        if response:  # Only print success if we got a response
-            print(f"[ReplicaManager-{self.replica_id}] Replica registered")
-        #self.stub.RegisterReplica(worker_service_pb2.replicaStatus(replica_id = self.replica_id, pid = self.pid, port = self.port, state = self.replica_state))
-        #self.stub.RegisterReplica(RegisterReplicaRequest(replica_id = self.replica_id, pid = self.pid, port = self.port,replica_state = self.replica_state))
-
-    def load_and_run_model(self,model,input):
-        print("Loading model")
-        #Todo need to run the model inference here
-        time.sleep(10)
-        return f"done {model}"
- 
+            engine_args = AsyncEngineArgs(
+                model=self.model_id,
+                max_num_batched_tokens=262144,  
+                max_num_seqs=1024,             
+                max_model_len=2048,          
+                dtype="float16",             
+                trust_remote_code=True,
+                device="cuda",               
+                gpu_memory_utilization=0.90, 
+                  
+            )
+            # This is a long, blocking call
+            self.engine = AsyncLLMEngine.from_engine_args(engine_args)
+            print(f"[ReplicaManager-{self.deployment_id}] VLLM Engine initialized.") 
+        except Exception as e:
+            print(f"[ReplicaManager- {self.deployment_id}] Error loading model: {e}")
+            return
     
-    # Health ping from the worker node
-    def Ping(self, request, context):
-        print(f"[ReplicaManager-{self.replica_id}] Received ping from head node : {time.time()}")
-        return worker_service_pb2.Ack(acknowledged=True)
-    '''
-    def PushTask(self, request, context):
-        print(f"[ReplicaManager-{self.replica_id}] Received task from worker")
-        model = request.model
-        input = request.input
-        res = self.load_and_run_model(model, input)
-        print(f"[ReplicaManager-{self.replica_id}] Sending output to worker {res}")
-        return worker_service_pb2.TaskReply(result=res)
-    '''
-    
-    def send_health_updates(self):
-        while True:
-            success_this_cycle = False # Reset for each health update cycle
-            for attempt in range(1, 4): 
-                try:
-                    print(f"Attempting to send health update (Attempt {attempt}/3)...")
-                    response = self.stub.sendHealthupdate(worker_service_pb2.HealthStatus(replica_id=self.replica_id, status="healthy"))
+    def start_polling_metrics(self):
+        """Call this from C++ after event loop is running."""
+        self.loop.call_soon_threadsafe(
+            self.loop.create_task,
+            self.poll_metrics_periodically()
+        )
+    async def generate_stream(self, prompt: str, queue_callback):
+        """
+        Asynchronously generates tokens and puts them into a queue
+        provided by the C++ caller.
+        """
+        print(f"[ReplicaManager-{self.deployment_id}] generate_stream called with prompt: {prompt[:100]}...")
+        print(f"[ReplicaManager-{self.deployment_id}] queue_callback type: {type(queue_callback)}")
+        
+        sampling_params = SamplingParams(max_tokens=500, temperature=0.7)
+        request_id = random_uuid()
+        print(f"[ReplicaManager-{self.deployment_id}] Generating stream for request_id: {request_id}")
+        results_generator = self.engine.generate(prompt, sampling_params, request_id)
+        
+        sent_position = 0
+        start_time = time.time()
+        first_token_received = False
+        last_token_received = False
+        last_token_time = time.time()
+        try:
+            async for request_output in results_generator:
+                current_text = request_output.outputs[0].text
+                new_text = current_text[sent_position:]
+                print(f"[ReplicaManager-{self.deployment_id}] Generated text: {new_text}")
+                if new_text:
+                    # Put the generated text into the C++ queue
+                    #print(f"[ReplicaManager-{self.deployment_id}] Calling queue_callback.put with: {new_text[:50]}...")
+                    if not first_token_received:
+                        ttft = time.time() - start_time
+                        first_token_received = True
+                        FIRST_TOKEN_LATENCY.labels(deployment_name=self.deployment_name).observe(ttft)
+                       
+                    queue_callback.put(new_text)
+                    sent_position = len(current_text)
+                    if last_token_received:
+                        INTER_TOKEN_LATENCY.labels(deployment_name=self.deployment_name).observe(time.time() - last_token_time)
+                    last_token_received = True
+                    last_token_time = time.time()
 
-                    if response.ack == 0:
-                        print("Health update response indicates worker considers replica dead. Terminating process.")
-                        os.kill(self.pid, signal.SIGTERM)
-                        return # Exit thread as process is terminating
-                    
-                    print("Health update sent successfully.")
-                    success_this_cycle = True
-                    break # Exit retry loop on success
-                
-                except grpc.RpcError as e:
-                    print(f"gRPC error on attempt {attempt}/3 sending health update: code={e.code()}, details='{e.details()}'")
-                except Exception as e:
-                    print(f"Error on attempt {attempt}/3 sending health update: {e}")
-                
-                if attempt < 3: # If not the last attempt
-                    print("Retrying health update in 2 seconds...")
-                    time.sleep(2) # Wait before retrying
-
-            if not success_this_cycle:
-                print("Failed to send health update after 3 attempts. Terminating process.")
-                os.kill(self.pid, signal.SIGTERM)
-                return # Exit thread as process is terminating
+            # Record latency after the last token is generated
+            REQUEST_LATENCY.labels(deployment_name=self.deployment_name).observe(time.time() - start_time)
+            REQUEST_COUNT.labels(deployment_name=self.deployment_name, status="success").inc()
             
-            # Wait for the configured interval before the next health update cycle
-            time.sleep(self.health_update_interval)
+        except Exception as e:
+            # Signal an error
+            print(f"[ReplicaManager-{self.deployment_id}] Exception in generate_stream: {e}")
+            queue_callback.put(f"[PYTHON ERROR] {str(e)}")
+            REQUEST_COUNT.labels(deployment_name=self.deployment_name, status="error").inc()
+        finally:
+            # Signal the end of the stream with a special sentinel value (None)
+            print(f"[ReplicaManager-{self.deployment_id}] Sending None to close stream")
+            queue_callback.put(None)
 
-
-        
-
-
-def main():
-    parser = argparse.ArgumentParser()
     
-    parser.add_argument("--replica_id", type=int, required=True)
-    parser.add_argument("--parent_port", type=str, required=True)
-    parser.add_argument("--port", type=str, required=True)
-    parser.add_argument("--deployment_name", type=str, required=True)
-    parser.add_argument("--deployment_id", type=int, required=True)
-    parser.add_argument("--num_cpus", type=int, required=True)
-    parser.add_argument("--num_gpus", type=int, required=True)
-
-    args = parser.parse_args()
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=2))
-    replica_service_pb2_grpc.add_WorkerServiceServicer_to_server(
-        ReplicaManager(args.parent_port, args.replica_id, args.port, args.deployment_name, args.deployment_id), server
-    )
-    server.add_insecure_port(f"[::]:{args.port}")
-    server.start()
-    print(f"Replica {args.replica_id} listening on port {args.port}")
-    server.wait_for_termination()
-
-if __name__ == "__main__":
-    main()
+           
+   
+    
 
 
-#

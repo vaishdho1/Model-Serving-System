@@ -6,14 +6,25 @@ PROTO_DIR="src/protos"
 # Output directory for generated Python files
 GENERATED_DIR="src/generated"
 
-# --- FIX: Ensure we use the Python from the virtual environment ---
+# --- Detect Python environment (virtual env or system) ---
 # Check if a virtual environment is active
-if [ -z "$VIRTUAL_ENV" ]; then
-    echo "ERROR: No virtual environment is active. Please run 'source myenv/bin/activate' first."
-    exit 1
+if [ -n "$VIRTUAL_ENV" ]; then
+    echo "Using Python from virtual environment: $VIRTUAL_ENV"
+    PYTHON_EXEC="$VIRTUAL_ENV/bin/python"
+else
+    echo "No virtual environment detected. Using system Python."
+    # Try python3 first, then python
+    if command -v python3 >/dev/null 2>&1; then
+        PYTHON_EXEC="python3"
+    elif command -v python >/dev/null 2>&1; then
+        PYTHON_EXEC="python"
+    else
+        echo "ERROR: No Python executable found. Please install Python."
+        exit 1
+    fi
 fi
-# Use the python from the active VIRTUAL_ENV path
-PYTHON_EXEC="$VIRTUAL_ENV/bin/python"
+
+echo "Using Python executable: $PYTHON_EXEC"
 
 
 # Create the output directory if it doesn't exist

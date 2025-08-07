@@ -1,23 +1,120 @@
-# Dockerfile.controller
+# Stage 1: Build the C++ Application
+FROM ubuntu:24.04 AS builder
 
-# 1. Start from a lightweight, official Python image
-FROM python:3.10-slim
+# 1. Set environment to non-interactive
+ENV DEBIAN_FRONTEND=noninteractive
 
-# 2. Set the working directory inside the container
+# 2. Install build tools and GCC 14 for full C++23 support
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    software-properties-common \
+    && \
+    add-apt-repository -y ppa:ubuntu-toolchain-r/test && \
+    apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    python3-pip \
+    gcc-14 \
+    g++-14 \
+    cmake \
+    make \
+    git \
+    gdb \
+    pkg-config \
+    # Install dev libraries for Boost, gRPC, and Protobuf from apt
+    libboost-all-dev \
+    libgrpc++-dev \
+    libprotobuf-dev \
+    protobuf-compiler-grpc \
+    curl \
+    zip \
+    unzip \
+    tar \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set GCC 14 as the default compilers for better C++23 support
+ENV CC=/usr/bin/gcc-14
+ENV CXX=/usr/bin/g++-14
+
+# 3. Manually clone, build, and install prometheus-cpp
+RUN git clone --recursive https://github.com/jupp0r/prometheus-cpp.git /tmp/prometheus-cpp && \
+    cd /tmp/prometheus-cpp && mkdir build && cd build && \
+    cmake .. -DBUILD_SHARED_LIBS=ON -DENABLE_PULL=ON -DENABLE_PUSH=OFF && \
+    make -j$(nproc) && make install && ldconfig && rm -rf /tmp/prometheus-cpp
+
+# 4. Clone, build, and install asio-grpc
+RUN git clone https://github.com/Tradias/asio-grpc.git /tmp/asio-grpc && \
+    cd /tmp/asio-grpc && mkdir build && cd build && \
+    cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/usr/local && \
+    make -j$(nproc) && make install && \
+    ldconfig && rm -rf /tmp/asio-grpc
+
+
+# 5. Set the working directory
 WORKDIR /app
 
-# 3. Copy the lean requirements file for the controller
-COPY requirements/requirements-controller.txt .
-
-# 4. Install only the necessary dependencies
-RUN pip install --no-cache-dir -r requirements-controller.txt
-
-# 5. Copy all your project source code into the container
+# 6. Copy all source code and build files
 COPY src/ src/
+COPY CMakeLists.txt .
 
+# 7. Build the C++ http_proxy executable
+RUN mkdir -p build && \
+    cd build && \
+    # Build ONLY the http_proxy executable in Release mode
+    cmake .. -DBUILD_HTTP_PROXY=ON -DBUILD_REPLICA_SERVER=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/usr/local && \
+    make http_proxy -j$(nproc) && \
+    make install && \
+    ldconfig
 
-# 6. Set the Python path so your modules can be imported correctly
-ENV PYTHONPATH=/app
+# Stage 2: Final Production Image
+FROM ubuntu:24.04
 
-# 7. Define the command to run your head_controller application
-ENTRYPOINT ["python3", "-u", "-m", "src.components.headNode.head_controller"]
+# 1. Install only essential runtime dependencies, including the newer C++ standard library
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    software-properties-common \
+    gnupg \
+    && \
+    add-apt-repository -y ppa:ubuntu-toolchain-r/test && \
+    apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    gdb \
+    python3-pip \
+    libstdc++-13-dev \
+    # Install runtime libraries for gRPC, Protobuf, and Boost
+    libgrpc++1.51 \
+    libprotobuf32 \
+    libboost-program-options1.83.0 \
+    libboost-thread1.83.0 \
+    && rm -rf /var/lib/apt/lists/*
+
+# 2. Set up a non-root user
+RUN useradd -ms /bin/bash appuser
+
+# 3. Install Python requirements FIRST to leverage caching
+WORKDIR /home/appuser
+COPY requirements/requirements-controller.txt .
+USER appuser
+ENV PATH="/home/appuser/.local/bin:${PATH}"
+RUN pip3 install --no-cache-dir --user --break-system-packages -r requirements-controller.txt
+# Switch back to root to copy system files
+USER root
+
+# 4. Copy compiled assets from the builder stage (cache invalidates from here on change)
+COPY --from=builder /usr/local/bin/http_proxy /usr/local/bin/
+COPY --from=builder /usr/local/lib/libprometheus-cpp* /usr/local/lib/
+COPY --from=builder /usr/local/lib/libasio-grpc* /usr/local/lib/
+RUN ldconfig
+ENV LD_LIBRARY_PATH=/usr/local/lib
+
+# 5. Copy application source
+COPY --chown=appuser:appuser src/ src/
+COPY --chown=appuser:appuser scripts/ scripts/
+
+# 6. Switch back to appuser for final steps
+USER appuser
+ENV PYTHONPATH=/home/appuser
+
+# 7. Generate Python protobuf files
+RUN chmod +x scripts/compile_protos.sh && \
+    ./scripts/compile_protos.sh
+
+# 8. Set the entrypoint
+ENTRYPOINT ["python3", "-u", "src/components/headNode/head_controller.py"]

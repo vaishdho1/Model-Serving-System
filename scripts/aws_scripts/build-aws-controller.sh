@@ -9,10 +9,11 @@ export ECR_REPO_NAME="model-serving-controller"
 export IMAGE_TAG="v1"
 export DOCKERFILE_NAME="docker/Dockerfile.head"
 
-
+    
 # --- Script ---
 
-# 1. Build the image locally
+# 1. Build the image locally.
+
 echo "Step 1: Building Docker image..."
 docker build --platform linux/amd64 -t ${ECR_REPO_NAME}:${IMAGE_TAG} -f ${DOCKERFILE_NAME} .
 

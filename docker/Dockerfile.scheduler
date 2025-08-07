@@ -1,36 +1,51 @@
-# Dockerfile.scheduler
+# Dockerfile.scheduler (Robust Single-Stage Version)
 
-# 1. Start from an official NVIDIA CUDA image to get drivers and libraries.
-# This is an excellent choice as it matches the CUDA version for PyTorch and vLLM.
+# 1. Start from the NVIDIA CUDA development image based on Ubuntu 22.04.
+# This provides Python 3.10 (compatible with vLLM) and the CUDA toolkit.
 FROM nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04
 
-# 2. Set environment to non-interactive to prevent prompts during installation.
+# 2. Set environment and install all C++ and Python dependencies from apt.
 ENV DEBIAN_FRONTEND=noninteractive
-
-# 3. Install Python 3.10, pip, and other essentials on top of the base image.
 RUN apt-get update && \
-    apt-get install -y python3.10 python3-pip git && \
-    rm -rf /var/lib/apt/lists/*
+    apt-get install -y --no-install-recommends \
+    python3.10 python3-pip python3.10-dev \
+    git build-essential cmake pkg-config \
+    libprotobuf-dev protobuf-compiler libgrpc++-dev libgrpc-dev protobuf-compiler-grpc \
+    pybind11-dev libcurl4-openssl-dev zlib1g-dev libboost-all-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-# 4. Set the working directory.
+# 3. Set the working directory.
 WORKDIR /app
 
-# 5. Copy requirements file
+# 4. Copy requirements file and install Python dependencies.
 COPY requirements/requirements-scheduler.txt .
+# Pin pip/setuptools to stable versions to avoid compatibility errors with old packages.
+RUN python3.10 -m pip install --upgrade pip==23.3.1 setuptools==69.0.2
+# This two-step install is necessary for vLLM's build dependencies.
+RUN python3.10 -m pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cu121
+RUN python3.10 -m pip install --no-cache-dir -r requirements-scheduler.txt
 
-# 6. Install Python dependencies
-# The requirements file already includes the correct torch version and CUDA support
-RUN pip install --no-cache-dir -r requirements-scheduler.txt
+# 5. Build and install custom C++ libraries from source.
+RUN git clone --recursive https://github.com/jupp0r/prometheus-cpp.git /tmp/prometheus-cpp && \
+    cd /tmp/prometheus-cpp && mkdir build && cd build && \
+    cmake .. -DBUILD_SHARED_LIBS=ON && make -j$(nproc) && make install && \
+    ldconfig && rm -rf /tmp/prometheus-cpp
 
-# 7. Copy source code
+RUN git clone https://github.com/Tradias/asio-grpc.git /tmp/asio-grpc && \
+    cd /tmp/asio-grpc && mkdir build && cd build && \
+    cmake .. -DCMAKE_BUILD_TYPE=Release && make -j$(nproc) && make install && \
+    ldconfig && rm -rf /tmp/asio-grpc
+
+# 6. Copy all source code and build your C++ executable.
 COPY src/ src/
+COPY scripts/ scripts/
+COPY CMakeLists.txt.scheduler CMakeLists.txt
+RUN mkdir -p build && cd build && \
+    cmake .. -DCMAKE_PREFIX_PATH=/usr/local \
+             -DBUILD_REPLICA_SERVER=ON && \
+    make -j$(nproc) && make install
 
-
-#Run protos compilation script to get the latest generated protos
-
-
-# 8. Set the Python path so your modules can be imported correctly from the root.
+# 7. Final setup and entrypoint.
 ENV PYTHONPATH=/app
-
-# 9. Run the scheduler
+RUN chmod +x scripts/compile_protos.sh && ./scripts/compile_protos.sh
 CMD ["python3", "-u", "-m", "src.components.scheduler"]

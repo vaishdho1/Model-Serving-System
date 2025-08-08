@@ -12,6 +12,7 @@ build/
 .env
 .venv
 venv/
+venv_test/
 ENV/
 
 # IDE / Editor specific
@@ -30,4 +31,28 @@ logs/*.log
 .Spotlight-V100
 .Trashes
 ehthumbs.db
-Thumbs.db 
+Thumbs.db
+
+# C/C++ and CMake build artifacts
+cpp_build/
+CMakeFiles/
+*/CMakeFiles/
+CMakeCache.txt
+*/CMakeCache.txt
+cmake_install.cmake
+install_manifest.txt
+Makefile
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.so.*
+*.dylib
+*.dll
+*.pdb 
+
+# Generated sources (protobuf, grpc, etc.)
+src/generated/*
+!src/generated/__init__.py
+

@@ -84,10 +84,10 @@ Notes:
 
 
 ### C++ vs. Python proxy (summary)
-| Metric/Aspect | Python proxy (old) | C++ proxy (new) | Change |
+| Metric/Aspect | Python proxy+Python replica(old) | C++ proxy + C++ replica(new) | Change |
 |---|---|---|---|
-| P95 end to end latency | ≈100 s (peak stress) | ≈40–42 s | ~2.5× faster |
-| P50 latency | ≈80 s (normal load) | often 30–40 s in this run | higher under stress in charted run |
+| P95 end‑to‑end latency | ≈100 s | ≈40–42 s | ~2.5× faster |
+| P50 end‑to‑end latency | ≈100 s (normal load) | ≈30–40 s in this run | ~2.5-3x faster |
 | Throughput | Peak ≈100 RPS sustained | ≈40–70 RPS during ramps | lower peak, smoother ramps |
 | Concurrency | Up to ~1000 users | Up to ~1000 users | parity |
 | Failures | 0 | 0 | parity |

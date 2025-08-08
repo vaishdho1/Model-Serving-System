@@ -4,7 +4,7 @@ This project implements a **distributed model serving system** designed to effic
 Language Models (LLMs). The design separates the data plane from the control plane: a C++ HTTP proxy handles client traffic and token streaming, while Python coordinates deployments, routing, health, and lifecycle. Built with **gRPC** for internal communication and **HTTP** for client interfaces, the system delivers robust fault tolerance, automatic restart capabilities, and flexible deployment options while successfully handling **1000+ concurrent users** with **100+ RPS sustained throughput**.
 
 ## What’s new
-- C++ HTTP proxy replacing the Python proxy, providing lower overhead, faster time‑to‑first‑token, and steadier tail latency under load.
+- C++ HTTP proxy replacing the Python proxy, providing lower overhead, faster time to first token, and steadier tail latency under load.
 - Replica split: a C++ gRPC front (`replica_server.cc`) handles networking and streaming, while Python (`add_replica.py`) runs vLLM. This avoids GIL/event‑loop contention and scales concurrent streams more predictably.
 - Clear planes: a direct data path (proxy → replica) for token streaming, and a control path (head controller → scheduler) for lifecycle, routing, and health.
 - Improved observability: expanded Prometheus metrics at proxy and replica layers for capacity and SLO tracking.
@@ -22,7 +22,7 @@ Clients send requests to the C++ HTTP proxy, which forwards them to replicas ove
 - Replica (C++ + Python): C++ gRPC server with Python `add_replica.py` running vLLM for inference
 
 ## Key features
-- Streaming inference: token‑by‑token responses and fast time‑to‑first‑token
+- Streaming inference: token by token responses and fast time to first token
 - vLLM‑based replicas with asynchronous generation
 - Health aware, least loaded routing, strict separation of data and control planes
 - Prometheus metrics at proxy and replica layers
@@ -48,12 +48,12 @@ Notes
 
 ## Using the API
 
-Endpoints are per‑deployment. Use the deployment name as the URL path and send the prompt as plain text.
+Endpoints are per deployment. Use the deployment name as the URL path and send the prompt as plain text.
 
 - Method: POST
 - URL: `http://<host>:8000/<deployment_name>`
 - Body: text/plain (prompt)
-- Streaming: HTTP/1.1 chunked (use `curl -N` to render progressively)
+- Streaming: HTTP/1.1 chunked (use `curl -N`  for streaming output)
 
 Available deployments:
 - `http://localhost:8000/v1/chat/tinyllama`
@@ -86,8 +86,8 @@ Notes:
 ### C++ vs. Python proxy (summary)
 | Metric/Aspect | Python proxy (old) | C++ proxy (new) | Change |
 |---|---|---|---|
-| P95 latency | ≈100 s (peak stress) | ≈40–42 s | ~2.5× faster |
-| P50 latency | ≈10 s (normal load) | often 30–40 s in this run | higher under stress in charted run |
+| P95 end to end latency | ≈100 s (peak stress) | ≈40–42 s | ~2.5× faster |
+| P50 latency | ≈80 s (normal load) | often 30–40 s in this run | higher under stress in charted run |
 | Throughput | Peak ≈100 RPS sustained | ≈40–70 RPS during ramps | lower peak, smoother ramps |
 | Concurrency | Up to ~1000 users | Up to ~1000 users | parity |
 | Failures | 0 | 0 | parity |
@@ -97,6 +97,10 @@ Notes:
 - SLO‑aware autoscaling
 - Persistent Storage
 - Quantized inference (4‑/8‑bit)
+
+## Additional resources
+- Results: see `docs/results.pdf`
+- (Upcoming)Design document: see `docs/Design_doc` for detailed architecture and rationale
 
 
 

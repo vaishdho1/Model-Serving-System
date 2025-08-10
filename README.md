@@ -30,7 +30,7 @@ Clients send requests to the C++ HTTP proxy, which forwards them to replicas ove
 
 ## Getting started
 
-Quick example (AWS). For full instructions, see [`docs/Running.md`](docs/Running.md).
+Quick example (AWS).
 
 ```bash
 # Build and deploy
@@ -43,7 +43,7 @@ curl -N -X POST http://<host>:8000/v1/chat/tinyllama -H "Content-Type: text/plai
 ```
 
 Notes
-- These scripts assume an AWS environment. If your account or network layout differs, update the IDs/regions in the deployment scripts before running.
+- These scripts assume an AWS environment.
 - When a local, non‑AWS bootstrap flow is available, it will be documented here.
 
 ## Using the API
@@ -83,7 +83,7 @@ Notes:
 - Responses are streamed, clients should consume until connection close.
 
 
-### C++ vs. Python proxy (summary)
+## Results: C++ vs. Python proxy 
 | Metric/Aspect | Python proxy+Python replica(old) | C++ proxy + C++ replica(new) | Change |
 |---|---|---|---|
 | P95 end‑to‑end latency | ≈100 s | ≈40–42 s | ~2.5× faster |

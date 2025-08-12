@@ -100,7 +100,7 @@ Notes:
 
 ## Additional resources
 - Results: see `docs/results.pdf`
-- (Upcoming)Design document: see `docs/Design_doc` for detailed architecture and rationale
+- Design document: see `docs/design_document.pdf` for detailed architecture and rationale
 
 
 

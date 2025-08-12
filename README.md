@@ -1,7 +1,7 @@
 # Model Serving System
 
 This project implements a **distributed model serving system** designed to efficiently manage and serve Large 
-Language Models (LLMs). The design separates the data plane from the control plane: a C++ HTTP proxy handles client traffic and token streaming, while Python coordinates deployments, routing, health, and lifecycle. Built with **gRPC** for internal communication and **HTTP** for client interfaces, the system delivers robust fault tolerance, automatic restart capabilities, and flexible deployment options while successfully handling **1000+ concurrent users** with **100+ RPS sustained throughput**.
+Language Models (LLMs). The design separates the data plane from the control plane: a C++ HTTP proxy handles client traffic and token streaming, while Python coordinates deployments, routing, health, and lifecycle. Built with **gRPC** for internal communication and **HTTP** for client interfaces, the system delivers robust fault tolerance, automatic restart capabilities, and flexible deployment options while successfully handling **1000+ concurrent users** with **100+ RPS sustained throughput**. I have summarized my learnings in a blog post: [Technical blog post](https://vaishdho1.github.io/my-portfolio/llm-serving-system2.html)
 
 ## What’s new
 - C++ HTTP proxy replacing the Python proxy, providing lower overhead, faster time to first token, and steadier tail latency under load.

@@ -1,4 +1,4 @@
-# Distributed LLM Serving Infrastructure
+# Distributed LLM Serving Platform
 
 A distributed LLM serving system for low-latency, streaming inference. The system separates the request-serving data plane from the orchestration control plane: a C++ HTTP proxy handles client-facing streaming traffic, while a Python head controller manages deployment state, routing metadata, replica lifecycle, health, and worker coordination.
 
